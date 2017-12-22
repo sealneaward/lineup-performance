@@ -1,0 +1,6 @@
+*.pyc
+build/**
+dist/**
+lineup.egg-info/**
+*.csv
+*.json
