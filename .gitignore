@@ -4,3 +4,5 @@ dist/**
 lineup.egg-info/**
 *.csv
 *.json
+.idea/**
+venv/**
