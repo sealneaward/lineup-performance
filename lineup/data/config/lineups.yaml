@@ -1,5 +1,4 @@
-url: "https://www.basketball-reference.com/boxscores/plus-minus/%s.html"
-game: "201710180DAL"
+years: ['2015','2016', '2016']
 cookies: {
     'srcssfull': 'yes',
     'auth_checked': 'true',
