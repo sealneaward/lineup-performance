@@ -187,7 +187,7 @@ def main_plus_minus(data_config):
         scraping config
     """
     today = datetime.now().date()
-    years = data_config['']
+    years = data_config['years']
     on_court = pd.DataFrame()
 
     years = years[:1]
@@ -203,7 +203,6 @@ def main_plus_minus(data_config):
             team_stats = comment_soup.find("table", {"id": "team-stats-per_game"})
             if team_stats:
                 team_names = team_stats.find("tbody").findAll("td", {"data-stat": "team_name"})
-                team_names = team_names[:2]
                 for team_name in team_names:
                     team_page_link = team_name.find("a")['href']
                     abr_regex = re.compile("^\/teams\/(.*)\/.*\.html")
