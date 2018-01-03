@@ -1,5 +1,6 @@
-years: ['2015','2016', '2016']
-gameid: '201412250LAC'
+years: ['2016']
+#gameid: '201510270GSW'
+time_seperator: 'min'
 cookies: {
     'srcssfull': 'yes',
     'auth_checked': 'true',

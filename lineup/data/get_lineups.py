@@ -83,8 +83,9 @@ def process_plus_minus(plus_minus_link, isHomeGame, num_overtimes, players, team
     width_regex = re.compile("width:([0-9]+)px")
     try:
         response = urllib2.urlopen(urllib2.Request(plus_minus_link, headers={'User-Agent': 'Mozilla'})).read()
-    except urllib2.HTTPError:
-        return False
+    except Exception as err:
+        print(str(err))
+        return pd.DataFrame()
     pm_soup = BeautifulSoup(response, 'lxml')
     pm_div = pm_soup.find("div", {"class": "plusminus"})
     style_div =pm_div.find("div", recursive=False)
@@ -94,29 +95,38 @@ def process_plus_minus(plus_minus_link, isHomeGame, num_overtimes, players, team
     rows = team_table.findAll("div", recursive=False)[1:]
 
     total_minutes = 48.0 + (5.0 * num_overtimes)
+    total_seconds = total_minutes * 60.0
     minute_width = total_width / total_minutes
+    second_width = total_width / total_seconds
     for player_row, minutes_row in izip(*[iter(rows)] * 2):
         player_name = player_row.find('span').text
         player_obj = players[player_name]
         player_obj.games_count += 1
         curr_minute = 0.0
+        curr_sec = 0.0
         for bar in minutes_row.findAll('div'):
             if round(curr_minute) < 48:
                 classes = bar.get('class')
                 width = int(width_regex.search(bar.get('style')).group(1)) + 1
-                span_length = width / minute_width
+                span_length_min = width / minute_width
+                span_length_sec = width / second_width
 
-                start_time = int(round(curr_minute))
-                end_time = int(round(curr_minute + span_length))
+                start_min = int(round(curr_minute))
+                end_min = int(round(curr_minute + span_length_min))
+                start_sec = int(round(curr_sec))
+                end_sec = int(round(curr_sec + span_length_sec))
 
                 on_court_team_player_time = {}
                 on_court_team_player_time['team'] = team_abr
                 on_court_team_player_time['player'] = player_name
                 on_court_team_player_time['game'] = game
                 on_court_team_player_time['season'] = season
-                on_court_team_player_time['start_min'] = start_time
-                on_court_team_player_time['end_min'] = end_time
-                curr_minute += span_length
+                on_court_team_player_time['start_min'] = start_min
+                on_court_team_player_time['end_min'] = end_min
+                on_court_team_player_time['start_sec'] = start_sec
+                on_court_team_player_time['end_sec'] = end_sec
+                curr_minute += span_length_min
+                curr_sec += span_length_sec
 
                 if classes is not None and ("plus" in classes or "minus" in classes or "even" in classes):
                     on_court.append(on_court_team_player_time)
