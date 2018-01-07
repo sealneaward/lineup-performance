@@ -1,5 +1,5 @@
 years: ['2016']
-#gameid: '201510270GSW'
+gameid: '201510270GSW'
 time_seperator: 'min'
 cookies: {
     'srcssfull': 'yes',

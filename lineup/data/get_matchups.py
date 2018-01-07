@@ -1,12 +1,12 @@
-"""get_matchups.py
+"""get_lineups.py
 Usage:
-    get_matchups.py <f_data_config>
+    get_lineups.py <f_data_config>
 
 Arguments:
     <f_data_config>  example ''lineups.yaml''
 
 Example:
-    get_matchups.py lineups.yaml
+    get_lineups.py lineups.yaml
 """
 
 from __future__ import print_function
@@ -16,168 +16,166 @@ from docopt import docopt
 import yaml
 
 import lineup.config as CONFIG
+from lineup.data.utils import parse_play
 
-class LineupFormationException(Exception):
-    pass
+class MatchupException(Exception):
+	pass
 
-def _minute_ranges(player):
-    minutes_count = [0.0] * 48
-    for ind, r in player.iterrows():
-        for i in range(r['start_min'], r['end_min']):
-           minutes_count[i] += 1.0
-    return minutes_count
+def _cols(data_config):
+	"""
+	Get column names
+	"""
+	away_ids = ["away_%s" % id for id in list(range(5))]
+	home_ids = ["home_%s" % id for id in list(range(5))]
 
-def _second_ranges(player):
-    minutes_count = [0.0] * 2880
-    for ind, r in player.iterrows():
-        for i in range(r['start_sec'], r['end_sec']):
-           minutes_count[i] += 1.0
-    return minutes_count
+	if data_config['time_seperator'] == 'min':
+		cols = ['game', 'season', 'home_team', 'away_team', 'starting_min', 'end_min']
+	else:
+		cols = ['game', 'season', 'home_team', 'away_team', 'starting_sec', 'end_sec']
 
+	cols.extend(home_ids)
+	cols.extend(away_ids)
 
-def _form_lineup(lineups, lineup, team, game, season, starting_second, end_second, cols):
-    try:
-        assert len(lineup) == 5
-    except Exception:
-        raise LineupFormationException('Incorrect number of people in lineup')
-    lineup = lineup.loc[:, 'name'].values
-    data = [team, game, season, starting_second, end_second]
-    data.extend(lineup)
-    lineup = pd.DataFrame(data=[data], columns=cols)
-    lineups = lineups.append(lineup)
-
-    return lineups
-
-def _lineups_game_min(on_court, game, team, season):
-    team_on_court = pd.DataFrame()
-
-    # minute range
-    minutes = map(str, range(48))
-    on_court = on_court.groupby('player')
-    for name, player in on_court:
-        range_player = _minute_ranges(player)
-        data = [name, team, game, season] + range_player
-        cols = ['name', 'team', 'game', 'season'] + minutes
-        player = pd.DataFrame(data=[data], columns=cols)
-        team_on_court = team_on_court.append(player)
-
-    # define 5 player lineups
-    # for single team for a game
-    names = map(str, range(5))
-    cols = ['team', 'game', 'season', 'starting_minute', 'end_minute'] + names
-    lineups = pd.DataFrame(columns=cols)
-    current_lineup = team_on_court.loc[team_on_court[str(0)] == 1, :]
-    starting_minute = 0
-    for minute in range(48):
-        minute_lineup = team_on_court.loc[team_on_court[str(minute)] == 1, :]
-        if not current_lineup.equals(minute_lineup):
-            # add old lineup
-            end_minute = minute
-            try:
-                lineups = _form_lineup(lineups,current_lineup,team,game,season,starting_minute,end_minute,cols)
-            except LineupFormationException:
-                print('Something wrong in game lineup')
-            # start the time for new lineup
-            starting_minute = minute + 1
-            current_lineup = minute_lineup
-
-    # add last lineup
-    if not starting_minute == 48:
-        end_minute = 47
-        try:
-            lineups = _form_lineup(lineups, current_lineup, team, game, season, starting_minute, end_minute, cols)
-        except LineupFormationException:
-            print('Something wrong in end lineup')
-
-    return lineups
+	return cols
 
 
-def _lineups_game_sec(on_court, game, team, season):
-    team_on_court = pd.DataFrame()
+def _matchup(lineups, game, season, cols, time_start, time_end):
+	"""
+	Get lineup at time t
+	"""
+	lineup_ids = map(str, list(range(5)))
+	if lineups.empty:
+		raise MatchupException('no lineups at time')
+	if not len(lineups) == 2:
+		raise MatchupException('too many lineups at time')
 
-    # minute range
-    seconds = map(str, range(2880))
-    on_court = on_court.groupby('player')
-    for name, player in on_court:
-        range_player = _second_ranges(player)
-        data = [name, team, game, season] + range_player
-        cols = ['name', 'team', 'game', 'season'] + seconds
-        player = pd.DataFrame(data=[data], columns=cols)
-        team_on_court = team_on_court.append(player)
+	start_time = lineups.loc[:, time_start].max()
+	end_time = lineups.loc[:, time_end].min()
 
-    # define 5 player lineups
-    # for single team for a game
-    names = map(str, range(5))
-    cols = ['team', 'game', 'season', 'starting_sec', 'end_sec'] + names
-    lineups = pd.DataFrame(columns=cols)
-    current_lineup = team_on_court.loc[team_on_court[str(0)] == 1, :]
-    starting_sec = 0
-    for second in range(2880):
-        second_lineup = team_on_court.loc[team_on_court[str(second)] == 1, :]
-        if not current_lineup.equals(second_lineup):
-            # add old lineup
-            end_sec = second
-            try:
-                lineups = _form_lineup(lineups,current_lineup,team,game,season,starting_sec,end_sec,cols)
-            except LineupFormationException:
-                print('Something wrong in game lineup')
-            # start the time for new lineup
-            starting_sec = second + 1
-            current_lineup = second_lineup
+	for ind, lineup in lineups.iterrows():
+		home_id = lineup['game'][-3:]
+		if lineup['team'] == home_id:
+			home_team = lineup['team']
+			home_lineup = lineup
+			home_players = home_lineup[lineup_ids].values
+		else:
+			away_team = lineup['team']
+			away_lineup = lineup
+			away_players = away_lineup[lineup_ids].values
 
-    # add last lineup
-    if not starting_sec == 2880:
-        end_sec = 2879
-        try:
-            lineups = _form_lineup(lineups, current_lineup, team, game, season, starting_sec, end_sec, cols)
-        except LineupFormationException:
-            print('Something wrong in end lineup')
+	data = [game, season, home_team, away_team, start_time, end_time]
+	data.extend(home_players)
+	data.extend(away_players)
+	matchup = pd.DataFrame(data=[data], columns=cols)
 
-    return lineups
+	return matchup
 
 
-def _lineups(on_court, data_config):
-    """
-    Use the minute ranges to find lineup changes in games
-    """
-    gameids = on_court.loc[:, 'game'].drop_duplicates(inplace=False).values
-    lineups = pd.DataFrame()
+def _pbp(game):
+	"""
+	Scrape basketball reference game play-by-play by ID
+	Args:
+		game_ID (str): bball reference gameID
+	Returns: None
+		pickles pbp DataFrame to data directory
+	"""
+	url = ('http://www.basketball-reference.com/boxscores/pbp/{ID}.html').format(ID=game)
+	pbp = pd.read_html(url)[0]
+	pbp.columns = pbp.iloc[1]
+	pbp.columns = ['TIME', 'VISITORDESCRIPTION', 'VISITORRESULTS', 'SCORE', 'HOMERESULTS', 'HOMEDESCRIPTION']
+	pbp = pbp.drop(pbp.index[1])
+	pbp['QUARTER'] = pbp.TIME.str.extract('(.*?)(?=Q)', expand=False).str[0]
+	pbp['QUARTER'] = pbp['QUARTER'].fillna(method='ffill')
+	pbp['GAME'] = game
+	pbp = pbp.loc[~pbp.TIME.isin(['Time', '1st Q', '2nd Q', '3rd Q', '4th Q']), :]
 
-    # debugging purposes
-    if data_config['gameid'] is not None:
-        gameids = [on_court.loc[on_court.game == data_config['gameid'], 'game'].values[0], '']
+	for ind, play in pbp.iterrows():
+		play = parse_play(play)
+		if not play.empty:
+			pbp.iloc[ind] = play
+
+	return pbp
 
 
-    for gameid in gameids:
-        try:
-            on_court_game = on_court.loc[on_court.game == gameid]
-            season = on_court_game.loc[:, 'season'].drop_duplicates(inplace=False).values[0]
-            teams = on_court_game.loc[:, 'team'].drop_duplicates(inplace=False).values
+def _game_matchups(lineups, game, season, cols):
+	"""
+	Get matchups for game
+	"""
 
-            for team in teams:
-                on_court_team = on_court_game.loc[on_court_game.team == team, :]
-                if data_config['time_seperator'] == 'min':
-                    game_lineups = _lineups_game_min(on_court_team, gameid, team, season)
-                else:
-                    game_lineups = _lineups_game_sec(on_court_team, gameid, team, season)
-                lineups = lineups.append(game_lineups)
-        except Exception as err:
-             print('Something went wrong in game: %s' % (gameid))
+	if data_config['time_seperator'] == 'min':
+		time_start = 'starting_minute'
+		time_end = 'end_minute'
+		time_range = range(48)
+	else:
+		time_start = 'starting_sec'
+		time_end = 'end_sec'
+		time_range = range(2880)
 
-    return lineups
+	matchups = pd.DataFrame()
+	starting_lineups = lineups.loc[(lineups[time_start] <= 0) & (lineups[time_end] >= 0), :]
+	current_matchup = _matchup(game=game, season=season, lineups=starting_lineups, cols=cols, time_start=time_start, time_end=time_end)
+
+	for time in time_range:
+		try:
+			time_lineups = lineups.loc[(lineups[time_start] <= time) & (lineups[time_end] >= time), :]
+			matchup = _matchup(game=game, season=season, lineups=time_lineups, cols=cols, time_start=time_start, time_end=time_end)
+			if not matchup.equals(current_matchup):
+				# lineup change detected
+				# record previous matchup
+				matchups = matchups.append(current_matchup)
+				current_matchup = matchup
+		except MatchupException:
+			continue
+
+	matchups = matchups.append(current_matchup)
+
+	return matchups
+
+
+def _matchups(data_config, lineups):
+	"""
+	Form lineup matches for embedding purposes.
+	For each minute form ten man lineup consisting of team A and team B at time T
+
+	Parameters
+	----------
+	data_config: dict
+		additional config setting
+	lineups: pandas.DataFrame
+		information on single team lineup at time T
+	"""
+	matchups = pd.DataFrame()
+	cols = _cols(data_config)
+
+	# debugging purposes
+	season = '2016'
+	if data_config['gameid'] is not None:
+		gameids = [lineups.loc[lineups.game == data_config['gameid'], 'game'].values[0], '']
+	else:
+		gameids = lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
+
+	for game in gameids:
+		pbp = _pbp(game)
+		game_lineups = lineups.loc[lineups.game == game, :]
+		game_matchups = _game_matchups(lineups=game_lineups, cols=cols, game=game, season=season)
+		matchups = matchups.append(game_matchups)
+
+	return matchups
+
 
 if __name__ == '__main__':
-    arguments = docopt(__doc__)
-    print ("...Docopt... ")
-    print(arguments)
-    print ("............\n")
+	arguments = docopt(__doc__)
+	print("...Docopt... ")
+	print(arguments)
+	print("............\n")
 
-    f_data_config = '%s/%s' % (CONFIG.data.config.dir, arguments['<f_data_config>'])
-    data_config = yaml.load(open(f_data_config, 'rb'))
+	f_data_config = '%s/%s' % (CONFIG.data.config.dir, arguments['<f_data_config>'])
+	data_config = yaml.load(open(f_data_config, 'rb'))
 
-    on_court = pd.read_csv('%s/%s' % (CONFIG.data.lineups.dir, 'on_court_players.csv'))
-    lineups = _lineups(on_court, data_config)
-    if data_config['time_seperator'] == 'min':
-        lineups.to_csv('%s/%s' % (CONFIG.data.lineups.dir, 'lineups-min.csv'), index=False)
-    else:
-        lineups.to_csv('%s/%s' % (CONFIG.data.lineups.dir, 'lineups-sec.csv'), index=False)
+	if data_config['time_seperator'] == 'min':
+		lineups = pd.read_csv('%s/%s' % (CONFIG.data.lineups.dir, 'lineups-min.csv'))
+	else:
+		lineups = pd.read_csv('%s/%s' % (CONFIG.data.lineups.dir, 'lineups-sec.csv'))
+
+	matchups = _matchups(data_config, lineups)
+	matchups.to_csv('%s/%s' % (CONFIG.data.matchups.dir, 'lineups-min.csv'), index=False)
