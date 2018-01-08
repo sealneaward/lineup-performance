@@ -38,6 +38,94 @@ def _cols(data_config):
 
 	return cols
 
+def _performance_vector(team_matchup_pbp, team):
+	"""
+	Get performance vector
+	"""
+	fga = len(team_matchup_pbp.loc[team_matchup_pbp.is_fga == True, :])
+	fgm = len(team_matchup_pbp.loc[team_matchup_pbp.is_fgm == True, :])
+	fga_2 = len(team_matchup_pbp.loc[(team_matchup_pbp.is_fga == True) & (team_matchup_pbp.is_three == False), :])
+	fgm_2 = len(team_matchup_pbp.loc[(team_matchup_pbp.is_fgm == True) & (team_matchup_pbp.is_three == False), :])
+	fga_3 = len(team_matchup_pbp.loc[(team_matchup_pbp.is_fga == True) & (team_matchup_pbp.is_three == True), :])
+	fgm_3 = len(team_matchup_pbp.loc[(team_matchup_pbp.is_fgm == True) & (team_matchup_pbp.is_three == True), :])
+	ast = len(team_matchup_pbp.loc[team_matchup_pbp.is_assist == True, :])
+	blk = len(team_matchup_pbp.loc[team_matchup_pbp.is_block == True, :])
+	pf = len(team_matchup_pbp.loc[team_matchup_pbp.is_pf == True, :])
+	reb = len(team_matchup_pbp.loc[team_matchup_pbp.is_reb == True, :])
+	dreb = len(team_matchup_pbp.loc[team_matchup_pbp.is_dreb == True, :])
+	oreb = len(team_matchup_pbp.loc[team_matchup_pbp.is_oreb == True, :])
+	pts = fgm_2 * 2 + fgm_3 * 3
+	if fga > 0:
+		pct = (1.0 * fgm)/fga
+	else:
+		pct = 0.0
+	if fga_2 > 0:
+		pct_2 = (1.0 * fgm_2) / fga_2
+	else:
+		pct_2 = 0.0
+	if fga_3 > 0:
+		pct_3 = (1.0 * fgm_3) / fga_3
+	else:
+		pct_3 = 0.0
+
+	cols = ['fga', 'fgm', 'fga_2', 'fgm_2', 'fga_3', 'fgm_3', 'ast', 'blk', 'pf', 'reb', 'dreb', 'oreb', 'pts', 'pct', 'pct_2', 'pct_3']
+	cols = ['%s_%s' % (col, team) for col in cols]
+	data = [fga, fgm, fga_2, fgm_2, fga_3, fgm_3, ast, blk, pf, reb, dreb, oreb, pts, pct, pct_2, pct_3]
+
+	performance = pd.DataFrame(data=[data], columns=cols)
+
+	return performance
+
+def _performance(matchup, pbp):
+	"""
+	Get performance for single matchup
+	"""
+	performance = pd.DataFrame()
+	starting_min = matchup['starting_min']
+	end_min = matchup['end_min']
+
+	matchup_pbp = pbp.loc[(pbp.minute >= starting_min) & (pbp.minute <= end_min), :]
+
+	# get totals for home
+	team_matchup_pbp = matchup_pbp.loc[matchup_pbp.home == True, :]
+	performance_home = _performance_vector(team_matchup_pbp, 'home')
+
+	# get totals for visitor
+	team_matchup_pbp = matchup_pbp.loc[matchup_pbp.home == False, :]
+	performance_away = _performance_vector(team_matchup_pbp, 'visitor')
+
+	performance = pd.concat([performance_home, performance_away])
+
+	return performance
+
+
+def _matchup_performances(matchups, pbp):
+	"""
+	Create performance vectors for each of the matchups
+
+	Parameters
+	----------
+	matchups: pandas.DataFrame
+		time in/out of lineup matchups
+	pbp: pandas.DataFrame
+		events in game with timestamps
+
+	Returns
+	-------
+	matchups_performance: pandas.DataFrame
+		performance vectors
+	"""
+	matchups_performances = pd.DataFrame()
+
+	for ind, matchup in matchups.iterrows():
+		performance = _performance(matchup, pbp)
+		if not performance.empty:
+			matchups_performances = matchups_performances.append(performance)
+
+	matchups_performances = pd.concat([matchups, matchups_performances])
+	matchups_performances.to_csv('%s/%s' % (CONFIG.data.matchups.dir, 'matchups.csv'), index=False)
+
+	return matchups_performances
 
 def _matchup(lineups, game, season, cols, time_start, time_end):
 	"""
@@ -88,13 +176,17 @@ def _pbp(game):
 	pbp['QUARTER'] = pbp['QUARTER'].fillna(method='ffill')
 	pbp['GAME'] = game
 	pbp = pbp.loc[~pbp.TIME.isin(['Time', '1st Q', '2nd Q', '3rd Q', '4th Q']), :]
+	plays = []
 
 	for ind, play in pbp.iterrows():
 		play = parse_play(play)
-		if not play.empty:
-			pbp.iloc[ind] = play
+		if play is None:
+			continue
+		else:
+			plays.append(play)
 
-	return pbp
+	plays = pd.DataFrame(plays)
+	return plays
 
 
 def _game_matchups(lineups, game, season, cols):
@@ -149,8 +241,8 @@ def _matchups(data_config, lineups):
 
 	# debugging purposes
 	season = '2016'
-	if data_config['gameid'] is not None:
-		gameids = [lineups.loc[lineups.game == data_config['gameid'], 'game'].values[0], '']
+	if data_config['gameids'] is not None:
+		gameids = [lineups.loc[lineups.game.isin(data_config['gameids']), 'game'].values[0], '']
 	else:
 		gameids = lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
 
@@ -158,6 +250,7 @@ def _matchups(data_config, lineups):
 		pbp = _pbp(game)
 		game_lineups = lineups.loc[lineups.game == game, :]
 		game_matchups = _game_matchups(lineups=game_lineups, cols=cols, game=game, season=season)
+		game_matchups = _matchup_performances(matchups=game_matchups, pbp=pbp)
 		matchups = matchups.append(game_matchups)
 
 	return matchups
