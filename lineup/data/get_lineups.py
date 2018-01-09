@@ -14,6 +14,7 @@ from __future__ import print_function
 import pandas as pd
 from docopt import docopt
 import yaml
+from tqdm import tqdm
 
 import lineup.config as CONFIG
 
@@ -76,7 +77,8 @@ def _lineups_game_min(on_court, game, team, season):
             try:
                 lineups = _form_lineup(lineups,current_lineup,team,game,season,starting_minute,end_minute,cols)
             except LineupFormationException:
-                print('Something wrong in game lineup')
+                # print('Something wrong in game lineup')
+                continue
             # start the time for new lineup
             starting_minute = minute + 1
             current_lineup = minute_lineup
@@ -87,7 +89,8 @@ def _lineups_game_min(on_court, game, team, season):
         try:
             lineups = _form_lineup(lineups, current_lineup, team, game, season, starting_minute, end_minute, cols)
         except LineupFormationException:
-            print('Something wrong in end lineup')
+            # print('Something wrong in end lineup')
+            del names
 
     return lineups
 
@@ -144,11 +147,12 @@ def _lineups(on_court, data_config):
     lineups = pd.DataFrame()
 
     # debugging purposes
-    if data_config['gameid'] is not None:
-        gameids = [on_court.loc[on_court.game == data_config['gameid'], 'game'].values[0], '']
+    # if data_config['gameids'] is not None:
+    #     gameids = on_court.loc[on_court.game.isin(data_config['gameids']), 'game'].values
 
+    gameids = on_court.loc[:, 'game'].drop_duplicates(inplace=False).values
 
-    for gameid in gameids:
+    for gameid in tqdm(gameids):
         try:
             on_court_game = on_court.loc[on_court.game == gameid]
             season = on_court_game.loc[:, 'season'].drop_duplicates(inplace=False).values[0]
@@ -162,7 +166,8 @@ def _lineups(on_court, data_config):
                     game_lineups = _lineups_game_sec(on_court_team, gameid, team, season)
                 lineups = lineups.append(game_lineups)
         except Exception as err:
-             print('Something went wrong in game: %s' % (gameid))
+            continue
+            # print('Something went wrong in game: %s' % (gameid)) investigate later
 
     return lineups
 

@@ -14,6 +14,7 @@ from __future__ import print_function
 import pandas as pd
 from docopt import docopt
 import yaml
+from tqdm import tqdm
 
 import lineup.config as CONFIG
 from lineup.data.utils import parse_play
@@ -73,14 +74,12 @@ def _performance_vector(team_matchup_pbp, team):
 	data = [fga, fgm, fga_2, fgm_2, fga_3, fgm_3, ast, blk, pf, reb, dreb, oreb, pts, pct, pct_2, pct_3]
 
 	performance = pd.DataFrame(data=[data], columns=cols)
-
 	return performance
 
 def _performance(matchup, pbp):
 	"""
 	Get performance for single matchup
 	"""
-	performance = pd.DataFrame()
 	starting_min = matchup['starting_min']
 	end_min = matchup['end_min']
 
@@ -94,7 +93,7 @@ def _performance(matchup, pbp):
 	team_matchup_pbp = matchup_pbp.loc[matchup_pbp.home == False, :]
 	performance_away = _performance_vector(team_matchup_pbp, 'visitor')
 
-	performance = pd.concat([performance_home, performance_away])
+	performance = pd.concat([performance_home, performance_away], axis=1)
 
 	return performance
 
@@ -115,17 +114,15 @@ def _matchup_performances(matchups, pbp):
 	matchups_performance: pandas.DataFrame
 		performance vectors
 	"""
-	matchups_performances = pd.DataFrame()
+	performances = pd.DataFrame()
 
 	for ind, matchup in matchups.iterrows():
 		performance = _performance(matchup, pbp)
 		if not performance.empty:
-			matchups_performances = matchups_performances.append(performance)
+			performances = performances.append(performance)
 
-	matchups_performances = pd.concat([matchups, matchups_performances])
-	matchups_performances.to_csv('%s/%s' % (CONFIG.data.matchups.dir, 'matchups.csv'), index=False)
-
-	return matchups_performances
+	performances = pd.concat([matchups, performances], axis=1)
+	return performances
 
 def _matchup(lineups, game, season, cols, time_start, time_end):
 	"""
@@ -205,7 +202,10 @@ def _game_matchups(lineups, game, season, cols):
 
 	matchups = pd.DataFrame()
 	starting_lineups = lineups.loc[(lineups[time_start] <= 0) & (lineups[time_end] >= 0), :]
-	current_matchup = _matchup(game=game, season=season, lineups=starting_lineups, cols=cols, time_start=time_start, time_end=time_end)
+	try:
+		current_matchup = _matchup(game=game, season=season, lineups=starting_lineups, cols=cols, time_start=time_start, time_end=time_end)
+	except MatchupException:
+		raise MatchupException
 
 	for time in time_range:
 		try:
@@ -241,17 +241,23 @@ def _matchups(data_config, lineups):
 
 	# debugging purposes
 	season = '2016'
-	if data_config['gameids'] is not None:
-		gameids = [lineups.loc[lineups.game.isin(data_config['gameids']), 'game'].values[0], '']
-	else:
-		gameids = lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
+	# if data_config['gameids'] is not None:
+	# 	gameids = lineups.loc[lineups.game.isin(data_config['gameids']), 'game'].drop_duplicates(inplace=False).values
+	# else:
+	# 	gameids = lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
 
-	for game in gameids:
-		pbp = _pbp(game)
-		game_lineups = lineups.loc[lineups.game == game, :]
-		game_matchups = _game_matchups(lineups=game_lineups, cols=cols, game=game, season=season)
-		game_matchups = _matchup_performances(matchups=game_matchups, pbp=pbp)
-		matchups = matchups.append(game_matchups)
+	gameids = lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
+	gameids = gameids[:100]
+
+	for game in tqdm(gameids):
+		try:
+			pbp = _pbp(game)
+			game_lineups = lineups.loc[lineups.game == game, :]
+			game_matchups = _game_matchups(lineups=game_lineups, cols=cols, game=game, season=season)
+			game_matchups = _matchup_performances(matchups=game_matchups, pbp=pbp)
+			matchups = matchups.append(game_matchups)
+		except Exception:
+			continue
 
 	return matchups
 
@@ -271,4 +277,4 @@ if __name__ == '__main__':
 		lineups = pd.read_csv('%s/%s' % (CONFIG.data.lineups.dir, 'lineups-sec.csv'))
 
 	matchups = _matchups(data_config, lineups)
-	matchups.to_csv('%s/%s' % (CONFIG.data.matchups.dir, 'lineups-min.csv'), index=False)
+	matchups.to_csv('%s/%s' % (CONFIG.data.matchups.dir, 'matchups.csv'), index=False)
