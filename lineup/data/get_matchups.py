@@ -205,7 +205,7 @@ def _game_matchups(lineups, game, season, cols):
 	try:
 		current_matchup = _matchup(game=game, season=season, lineups=starting_lineups, cols=cols, time_start=time_start, time_end=time_end)
 	except MatchupException:
-		raise MatchupException
+		return pd.DataFrame()
 
 	for time in time_range:
 		try:
@@ -247,17 +247,17 @@ def _matchups(data_config, lineups):
 	# 	gameids = lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
 
 	gameids = lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
-	gameids = gameids[:100]
 
 	for game in tqdm(gameids):
-		try:
-			pbp = _pbp(game)
-			game_lineups = lineups.loc[lineups.game == game, :]
-			game_matchups = _game_matchups(lineups=game_lineups, cols=cols, game=game, season=season)
-			game_matchups = _matchup_performances(matchups=game_matchups, pbp=pbp)
-			matchups = matchups.append(game_matchups)
-		except Exception:
+		pbp = _pbp(game)
+		game_lineups = lineups.loc[lineups.game == game, :]
+		game_matchups = _game_matchups(lineups=game_lineups, cols=cols, game=game, season=season)
+		if game_matchups.empty:
 			continue
+		game_matchups = _matchup_performances(matchups=game_matchups, pbp=pbp)
+		if game_matchups.empty:
+			continue
+		matchups = matchups.append(game_matchups)
 
 	return matchups
 
