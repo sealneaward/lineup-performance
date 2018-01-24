@@ -1,5 +1,6 @@
 years: ['2016']
 gameids: ['201510270GSW', '201510270CHI']
+limit: False
 time_seperator: 'min'
 cookies: {
     'srcssfull': 'yes',

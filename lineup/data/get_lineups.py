@@ -71,6 +71,7 @@ def _lineups_game_min(on_court, game, team, season):
     starting_minute = 0
     for minute in range(48):
         minute_lineup = team_on_court.loc[team_on_court[str(minute)] == 1, :]
+
         if not current_lineup.equals(minute_lineup):
             # add old lineup
             end_minute = minute
@@ -78,6 +79,7 @@ def _lineups_game_min(on_court, game, team, season):
                 lineups = _form_lineup(lineups,current_lineup,team,game,season,starting_minute,end_minute,cols)
             except LineupFormationException:
                 # print('Something wrong in game lineup')
+                current_lineup = team_on_court.loc[team_on_court[str(minute - 1)] == 1, :]
                 continue
             # start the time for new lineup
             starting_minute = minute + 1
@@ -143,14 +145,13 @@ def _lineups(on_court, data_config):
     """
     Use the minute ranges to find lineup changes in games
     """
-    gameids = on_court.loc[:, 'game'].drop_duplicates(inplace=False).values
     lineups = pd.DataFrame()
 
     # debugging purposes
-    # if data_config['gameids'] is not None:
-    #     gameids = on_court.loc[on_court.game.isin(data_config['gameids']), 'game'].values
-
-    gameids = on_court.loc[:, 'game'].drop_duplicates(inplace=False).values
+    if data_config['gameids'] is not None and data_config['limit']:
+        gameids = on_court.loc[on_court.game.isin(data_config['gameids']), 'game'].drop_duplicates(inplace=False).values
+    else:
+        gameids = on_court.loc[:, 'game'].drop_duplicates(inplace=False).values
 
     for gameid in tqdm(gameids):
         try:
