@@ -1,4 +1,4 @@
-from _config_section import ConfigSection
+from lineup._config_section import ConfigSection
 from lineup.data.constant import data_dir
 import os
 REAL_PATH = data_dir
@@ -21,8 +21,8 @@ data.nba.lineups.dir = "%s/%s" % (data.nhl.dir, "lineups")
 data.nhl.matchups = ConfigSection("matchups")
 data.nhl.matchups.dir = "%s/%s" % (data.nhl.dir, "matchups")
 
-data.nba.lineups = ConfigSection("lineups")
-data.nba.lineups.dir = "%s/%s" % (data.nba.dir, "lineups")
+data.nhl.lineups = ConfigSection("lineups")
+data.nhl.lineups.dir = "%s/%s" % (data.nhl.dir, "lineups")
 
 data.config = ConfigSection("config")
 data.config.dir = "%s/%s" % (data.dir, "config")

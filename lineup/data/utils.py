@@ -11,7 +11,7 @@ def _minute(play):
 	minute = (12 - int(play['TIME'].split(':')[0])) + ((int(play['QUARTER']) - 1) * 12) - 1
 	return minute
 
-def parse_play(play):
+def parse_nba_play(play):
 	"""Parse play details from a play-by-play string describing a play.
 	Assuming valid input, this function returns structured data in a dictionary
 	describing the play. If the play detail string was invalid, this function
@@ -37,7 +37,7 @@ def parse_play(play):
 		details = play['HOMEDESCRIPTION']
 
 	# if input isn't a string, return None
-	if not details or not isinstance(details, basestring):
+	if not details:
 		return None
 
 
@@ -195,5 +195,71 @@ def parse_play(play):
 		p['is_pf'] = True
 		p.update(m.groupdict())
 		return p
+
+	return None
+
+
+def parse_nhl_play(play):
+	"""
+	Parse play details from a play-by-play dataframe
+
+	Parameters
+	----------
+	play: pandas.DataFrame
+		play information
+
+	Returns
+	-------
+	play: pandas.DataFrame
+		parsed information specific to our problem
+	"""
+
+	if play['Strength'] != '5x5':
+		return None
+	elif play['Ev_Team'] == play['Away_Team']:
+		aw = True
+		hm = False
+		is_hm = False
+	elif play['Ev_Team'] == play['Home_Team']:
+		hm = True
+		aw = False
+		is_hm = True
+	else:
+		return None
+
+	# if input isn't a string, return None
+	details = play['Description']
+	if not details:
+		return None
+
+
+	p = {}
+	p['detail'] = details
+	p['home'] = hm
+	p['away'] = aw
+	p['is_home_play'] = is_hm
+	p['second'] = play['Seconds_Elapsed']
+	p['is_shot'] = None
+	p['is_shot_on_goal'] = None
+	p['is_goal'] = None
+	p['is_assist'] = None
+	p['is_block'] = None
+
+	if play['Event'] == 'SHOT':
+		p['is_shot'] = True
+		p['is_shot_on_goal'] = True
+		return p
+	elif play['Event'] == 'MISS' or play['Event'] == 'BLOCK':
+		p['is_shot'] = True
+		p['is_shot_on_goal'] = False
+		return p
+	elif play['Event'] == 'GOAL':
+		p['is_goal'] = True
+		if 'Assists' in str(play['Description']):
+			p['is_assist'] = True
+		else:
+			p['is_assist'] = False
+		return p
+
 
 	return None

@@ -11,6 +11,7 @@ Example:
 
 from docopt import docopt
 import hockey_scraper
+import yaml
 
 import lineup.config as CONFIG
 
@@ -23,7 +24,7 @@ def scrape_seasons(data_config):
     ----------
     data_config: yaml config
     """
-    for season in data['years']:
+    for season in data_config['years']:
         hockey_scraper.scrape_seasons([int(season)], True)
 
 if __name__ == '__main__':
@@ -34,3 +35,4 @@ if __name__ == '__main__':
 
 	f_data_config = '%s/%s' % (CONFIG.data.config.dir, arguments['<f_data_config>'])
 	data_config = yaml.load(open(f_data_config, 'rb'))
+	scrape_seasons(data_config)

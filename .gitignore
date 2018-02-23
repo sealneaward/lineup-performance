@@ -5,3 +5,4 @@ lineup.egg-info/**
 *.json
 .idea/**
 venv/**
+*.csv
