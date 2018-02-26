@@ -176,7 +176,7 @@ def _pbp(game):
 	plays = []
 
 	for ind, play in pbp.iterrows():
-		play = parse_play(play)
+		play = parse_nba_play(play)
 		if play is None:
 			continue
 		else:
