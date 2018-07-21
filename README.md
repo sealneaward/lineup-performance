@@ -21,3 +21,14 @@ else:
 python setup.py build
 python setup.py install
 ```
+
+### Data Setup
+
+1. In the `lineup/data/nba` config, execute these scripts.
+
+```
+python get_on_court.py
+python get_lineups.py
+python get_matchups.py
+python get_abilities.py
+```

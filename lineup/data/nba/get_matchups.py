@@ -186,7 +186,7 @@ def _pbp(game):
 	return plays
 
 
-def _game_matchups(lineups, game, season, cols):
+def _game_matchups(data_config, lineups, game, season, cols):
 	"""
 	Get matchups for game
 	"""
