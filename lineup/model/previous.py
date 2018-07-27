@@ -2,7 +2,7 @@ import importlib
 import pandas as pd
 from tqdm import tqdm
 
-from lineup.data.nba.get_matchups import _pbp, _cols, _game_matchups, _matchup, _performance, MatchupException
+from lineup.data.nba.get_matchups import _pbp, _cols, _game_matchups, _performance_vector, MatchupException
 
 class Previous:
     """
@@ -45,52 +45,14 @@ class Previous:
             game_matchups = _game_matchups(data_config=self.config, lineups=game_lineups, cols=cols, game=game, season=season)
             if game_matchups.empty:
                 continue
-            game_matchups = self._matchup_performances(matchups=game_matchups, pbp=pbp)
+            game_matchups = self._matchup_performances(matchups=game_matchups, lineups=game_lineups, pbp=pbp)
             if game_matchups.empty:
                 continue
             matchups = matchups.append(game_matchups)
 
         return matchups
 
-
-    def _game_matchups(self, game, season, cols):
-        """
-        Get matchups for game
-        """
-
-        if self.config['time_seperator'] == 'min':
-            time_start = 'starting_minute'
-            time_end = 'end_minute'
-            time_range = range(48)
-        else:
-            time_start = 'starting_sec'
-            time_end = 'end_sec'
-            time_range = range(2880)
-
-        matchups = pd.DataFrame()
-        starting_lineups = self.lineups.loc[(self.lineups[time_start] <= 0) & (self.lineups[time_end] >= 0), :]
-        try:
-            current_matchup = _matchup(game=game, season=season, lineups=starting_lineups, cols=cols, time_start=time_start, time_end=time_end)
-        except MatchupException:
-            return pd.DataFrame()
-
-        for time in time_range:
-            try:
-                time_lineups = self.lineups.loc[(self.lineups[time_start] <= time) & (self.lineups[time_end] >= time), :]
-                matchup = _matchup(game=game, season=season, lineups=time_lineups, cols=cols, time_start=time_start, time_end=time_end)
-                if not matchup.equals(current_matchup):
-                    # lineup change detected
-                    # record previous matchup
-                    matchups = matchups.append(current_matchup)
-                    current_matchup = matchup
-            except MatchupException:
-                continue
-
-        matchups = matchups.append(current_matchup)
-
-        return matchups
-
-    def _matchup_performances(self, matchups, pbp):
+    def _matchup_performances(self, matchups, lineups, pbp):
         """
         Create performance vectors for each of the matchups
 
@@ -107,11 +69,44 @@ class Previous:
             performance vectors
         """
         performances = pd.DataFrame()
+        previous_matchup = pd.DataFrame()
 
+        i = 0
         for ind, matchup in matchups.iterrows():
-            performance = _performance(matchup, pbp)
-            if not performance.empty:
-                performances = performances.append(performance)
+            if i > 0:
+                performance = self._performance(matchup, previous_matchup, pbp)
+                if not performance.empty:
+                    performances = performances.append(performance)
+            i += 1
+            previous_matchup = matchup
 
         performances = pd.concat([matchups, performances], axis=1)
         return performances
+
+    def _performance(self, matchup, previous_matchup, pbp):
+        """
+        Get performance for single matchup
+        """
+        starting_min = matchup['starting_min']
+        end_min = matchup['end_min']
+        previous_starting_min = previous_matchup['starting_min']
+        previous_end_min = previous_matchup['end_min']
+
+        matchup_pbp = pbp.loc[(pbp.minute >= starting_min) & (pbp.minute <= end_min), :]
+        previous_matchup_pbp = pbp.loc[(pbp.minute >= previous_starting_min) & (pbp.minute <= previous_end_min), :]
+
+        # get totals for home
+        team_matchup_pbp = matchup_pbp.loc[matchup_pbp.home == True, :]
+        performance_home = _performance_vector(team_matchup_pbp, 'home')
+        team_matchup_pbp = previous_matchup_pbp.loc[previous_matchup.home == True, :]
+        performance_home_previous = _performance_vector(team_matchup_pbp, 'home')
+
+        # get totals for visitor
+        team_matchup_pbp = matchup_pbp.loc[matchup_pbp.home == False, :]
+        performance_away = _performance_vector(team_matchup_pbp, 'visitor')
+        team_matchup_pbp = previous_matchup_pbp.loc[previous_matchup.home == False, :]
+        performance_away_previous = _performance_vector(team_matchup_pbp, 'visitor')
+
+        performance = pd.concat([performance_home, performance_away], axis=1)
+
+        return performance
