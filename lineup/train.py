@@ -14,7 +14,7 @@ from __future__ import print_function
 import pandas as pd
 from docopt import docopt
 import yaml
-
+from sklearn.metrics import classification_report
 
 import lineup.config as CONFIG
 from lineup.model.previous import Previous as model
@@ -23,7 +23,8 @@ def train(data_config, data):
     previous = model(data_config)
     previous.prep_data(data=data)
     previous.train()
-
+    predictions = previous.model.predict(previous.val_x)
+    print(classification_report(previous.val_y, predictions))
 
 if __name__ == '__main__':
     arguments = docopt(__doc__)

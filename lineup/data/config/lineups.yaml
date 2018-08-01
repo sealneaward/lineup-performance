@@ -19,3 +19,4 @@ headers: {
 }
 module: 'sklearn.svm'
 model: 'SVC'
+split: 0.3
