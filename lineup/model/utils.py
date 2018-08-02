@@ -45,3 +45,10 @@ def split(config, annotations, fold_index):
     val_annotations = annotations[val_start:val_end]
     train_annotations = annotations[:val_start] + annotations[val_end:]
     return train_annotations, val_annotations
+
+def clean(config, annotations, setting):
+    """
+    Use config columns to subset annotations to linear interopable features
+    """
+    annotations = annotations[config[setting]]
+    return annotations

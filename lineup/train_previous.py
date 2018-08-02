@@ -1,12 +1,12 @@
-"""train.py
+''"""train_previous.py
 Usage:
-    train.py <f_data_config>
+    train_previous.py <f_data_config>
 
 Arguments:
     <f_data_config>  example ''lineups.yaml''
 
 Example:
-    train.py lineups.yaml
+    train_previous.py lineups.yaml
 """
 
 from __future__ import print_function

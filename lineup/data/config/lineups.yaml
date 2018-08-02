@@ -20,3 +20,15 @@ headers: {
 module: 'sklearn.svm'
 model: 'SVC'
 split: 0.3
+cols: [
+'starting_min', 'end_min', 'fga_home', 'fgm_home', 'fga_2_home', 'fgm_2_home', 'fga_3_home',
+'fgm_3_home', 'ast_home', 'blk_home', 'pf_home', 'reb_home', 'dreb_home',
+'oreb_home', 'pts_home', 'pct_home', 'pct_2_home', 'pct_3_home', 'fga_visitor',
+'fgm_visitor', 'fga_2_visitor', 'fgm_2_visitor', 'fga_3_visitor','fgm_3_visitor',
+'ast_visitor', 'blk_visitor', 'pf_visitor', 'reb_visitor', 'dreb_visitor', 'oreb_visitor',
+'pts_visitor', 'pct_visitor', 'pct_2_visitor', 'pct_3_visitor', 'outcome'
+]
+lineup: [
+'away_0','away_1','away_2','away_3','away_4','away_team',
+'home_0','home_1','home_2','home_3','home_4','home_team'
+]
