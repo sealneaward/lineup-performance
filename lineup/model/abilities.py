@@ -37,7 +37,7 @@ class Abilities:
         self.home_abilities = home_abilities
         self.away_abilities = away_abilities
         self.matchups = self._matchups()
-        self.matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-previous.csv'), index=False)
+        self.matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-abilities.csv'), index=False)
 
     def _matchups(self):
         """
@@ -68,10 +68,15 @@ class Abilities:
                     if game_matchups.empty:
                         continue
                     game_matchups = self._matchup_performances(matchups=game_matchups, lineups=game_lineups, pbp=pbp)
+                    if game_matchups.empty:
+                        continue
+                    matchups = matchups.append(game_matchups)
 
             except TimeoutException as e:
                 print("Game sequencing too slow for %s - skipping" % (game))
                 continue
+
+        return matchups
 
     def _matchup_performances(self, matchups, lineups, pbp):
         """
@@ -90,19 +95,50 @@ class Abilities:
             performance vectors
         """
         performances = pd.DataFrame()
-        augmented_matchups = pd.DataFrame()
-        previous_matchup = pd.DataFrame()
 
         i = 0
         for ind, matchup in matchups.iterrows():
             performance = self._performance(matchup, pbp)
             if not performance.empty:
+                try:
+                    matchup = self._abilities(matchup)
+                except MatchupException:
+                    print('Abilities not found for home or away lineup')
+                    continue
                 if (int(performance['pts_home']) - int(performance['pts_visitor'])) > 0:
-                    performance['outcome'] = 1
+                    matchup['outcome'] = 1
                 elif (int(performance['pts_home']) - int(performance['pts_visitor'])) <= 0:
-                    performance['outcome'] = -1
+                    matchup['outcome'] = -1
+                performances = performances.append(matchup)
 
-                performances = performances.append(performance)
+        return performances
+
+    def _abilities(self, matchup):
+        """
+        Get abilities for single matchup
+        """
+        home_ability = self.home_abilities.loc[
+           (self.home_abilities['home_0'] == matchup['home_0']) &
+           (self.home_abilities['home_1'] == matchup['home_1']) &
+           (self.home_abilities['home_2'] == matchup['home_2']) &
+           (self.home_abilities['home_3'] == matchup['home_3']) &
+           (self.home_abilities['home_4'] == matchup['home_4'])
+        ,:
+        ]
+        away_ability = self.away_abilities.loc[
+           (self.away_abilities['away_0'] == matchup['away_0']) &
+           (self.away_abilities['away_1'] == matchup['away_1']) &
+           (self.away_abilities['away_2'] == matchup['away_2']) &
+           (self.away_abilities['away_3'] == matchup['away_3']) &
+           (self.away_abilities['away_4'] == matchup['away_4'])
+        , :
+        ]
+
+        if home_ability.empty or away_ability.empty:
+            raise MatchupException
+
+        abilities = pd.concat([home_ability, away_ability], axis=1)
+        return abilities
 
 
     def _performance(self, matchup, pbp):

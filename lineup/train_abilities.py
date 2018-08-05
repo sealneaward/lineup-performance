@@ -35,8 +35,8 @@ if __name__ == '__main__':
     f_data_config = '%s/%s' % (CONFIG.data.config.dir, arguments['<f_data_config>'])
     data_config = yaml.load(open(f_data_config, 'rb'))
     matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'lineups-min.csv'))
-    abilities_home = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'home_abilities.csv'))
-    abilities_away = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'away_abilities.csv'))
+    abilities_home = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'home_abilities.csv'))
+    abilities_away = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'away_abilities.csv'))
 
     train(data_config=data_config, data=matchups, away_abilities=abilities_away, home_abilities=abilities_home)
 

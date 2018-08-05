@@ -32,3 +32,11 @@ lineup: [
 'away_0','away_1','away_2','away_3','away_4','away_team',
 'home_0','home_1','home_2','home_3','home_4','home_team'
 ]
+away_abilities: [
+'away_0','away_1','away_2','away_3','away_4','fga_away','fgm_away','fga_2_away','fgm_2_away','fga_3_away','fgm_3_away',
+'ast_away','reb_away','dreb_away','oreb_away','pts_away','time_away','n_games_away'
+]
+home_abilities: [
+'home_0','home_1','home_2','home_3','home_4','fga_home','fgm_home','fga_2_home','fgm_2_home','fga_3_home','fgm_3_home',
+'ast_home','reb_home','dreb_home','oreb_home','pts_home','time_home','n_games_home'
+]
