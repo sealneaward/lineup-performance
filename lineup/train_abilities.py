@@ -21,7 +21,7 @@ from lineup.model.abilities import Abilities as model
 
 def train(data_config, data, home_abilities, away_abilities):
     abilities = model(data_config)
-    abilities.prep_data(data=data, home_abilities=home_abilities, away_abilities=away_abilities)
+    # abilities.prep_data(data=data, home_abilities=home_abilities, away_abilities=away_abilities)
     abilities.train()
     predictions = abilities.model.predict(abilities.val_x)
     print(classification_report(abilities.val_y, predictions))

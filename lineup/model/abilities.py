@@ -39,6 +39,21 @@ class Abilities:
         self.matchups = self._matchups()
         self.matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-abilities.csv'), index=False)
 
+    def train(self):
+        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-abilities.csv'))
+
+        # clean
+        self.matchups = clean(self.config, self.matchups, 'abilities')
+
+        # split to train and test split
+        Y = self.matchups['outcome']
+        self.matchups.drop(['outcome'], axis=1, inplace=True)
+        X = self.matchups
+        self.train_x, self.val_x, self.train_y, self.val_y = train_test_split(X, Y, test_size=self.config['split'])
+
+        self.model.fit(self.train_x, self.train_y)
+
+
     def _matchups(self):
         """
         Form lineup matches for embedding purposes.
@@ -117,6 +132,10 @@ class Abilities:
         """
         Get abilities for single matchup
         """
+        abilities = pd.DataFrame()
+        home_ability = pd.DataFrame()
+        away_ability = pd.DataFrame()
+
         home_ability = self.home_abilities.loc[
            (self.home_abilities['home_0'] == matchup['home_0']) &
            (self.home_abilities['home_1'] == matchup['home_1']) &
@@ -137,7 +156,20 @@ class Abilities:
         if home_ability.empty or away_ability.empty:
             raise MatchupException
 
-        abilities = pd.concat([home_ability, away_ability], axis=1)
+        home_data = home_ability.values[0]
+        home_cols = home_ability.columns.values
+        away_data = away_ability.values[0]
+        away_cols = away_ability.columns.values
+
+        data = []
+        data.extend(home_data)
+        data.extend(away_data)
+
+        cols = []
+        cols.extend(home_cols)
+        cols.extend(away_cols)
+
+        abilities = pd.DataFrame(data=[data], columns=cols)
         return abilities
 
 

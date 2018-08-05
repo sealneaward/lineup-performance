@@ -41,7 +41,7 @@ class Previous:
         self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-previous.csv'))
 
         # clean
-        self.matchups = clean(self.config, self.matchups, 'cols')
+        self.matchups = clean(self.config, self.matchups, 'abilities')
 
         # split to train and test split
         Y = self.matchups['outcome']
