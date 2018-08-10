@@ -1,0 +1,6 @@
+sklearn:
+  module: 'sklearn.svm'
+  model: 'SVC'
+model:
+  module: 'lineup.model.adjusted'
+  model: 'Adjusted'

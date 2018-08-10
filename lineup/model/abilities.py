@@ -28,14 +28,16 @@ class Abilities:
     """
     Use previous lineup/matchup data as input for model
     """
-    def __init__(self, config):
-        self.config = config
-        self.model = getattr(importlib.import_module(config['module']), config['model'])()
+    def __init__(self, data_config, model_config, data):
+        self.data = data
+        self.model_config = model_config
+        self.data_config = data_config
+        self.model = getattr(importlib.import_module(self.model_config['sklearn']['module']), self.model_config['sklearn']['model'])()
 
-    def prep_data(self, data, home_abilities, away_abilities):
-        self.lineups = data
-        self.home_abilities = home_abilities
-        self.away_abilities = away_abilities
+    def prep_data(self, data):
+        self.lineups = self.data
+        self.home_abilities = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'home_abilities.csv'))
+        self.away_abilities = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'away_abilities.csv'))
         self.matchups = self._matchups()
         self.matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-abilities.csv'), index=False)
 
@@ -43,13 +45,13 @@ class Abilities:
         self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-abilities.csv'))
 
         # clean
-        self.matchups = clean(self.config, self.matchups, 'abilities')
+        self.matchups = clean(self.data_config, self.matchups, 'abilities')
 
         # split to train and test split
         Y = self.matchups['outcome']
         self.matchups.drop(['outcome'], axis=1, inplace=True)
         X = self.matchups
-        self.train_x, self.val_x, self.train_y, self.val_y = train_test_split(X, Y, test_size=self.config['split'])
+        self.train_x, self.val_x, self.train_y, self.val_y = train_test_split(X, Y, test_size=self.data_config['split'])
 
         self.model.fit(self.train_x, self.train_y)
 
@@ -68,7 +70,7 @@ class Abilities:
             information on single team lineup at time T
         """
         matchups = pd.DataFrame()
-        cols = _cols(self.config)
+        cols = _cols(self.data_config)
 
         # debugging purposes
         season = '2016'
@@ -79,7 +81,7 @@ class Abilities:
                 with time_limit(30):
                     pbp = _pbp(game)
                     game_lineups = self.lineups.loc[self.lineups.game == game, :]
-                    game_matchups = _game_matchups(data_config=self.config, lineups=game_lineups, cols=cols, game=game, season=season)
+                    game_matchups = _game_matchups(data_config=self.data_config, lineups=game_lineups, cols=cols, game=game, season=season)
                     if game_matchups.empty:
                         continue
                     game_matchups = self._matchup_performances(matchups=game_matchups, lineups=game_lineups, pbp=pbp)

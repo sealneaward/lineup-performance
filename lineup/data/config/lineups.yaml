@@ -17,8 +17,6 @@ headers: {
     'Cache-Control': 'max-age=0',
     'Connection': 'keep-alive',
 }
-module: 'sklearn.svm'
-model: 'SVC'
 split: 0.3
 previous: [
 'starting_min', 'end_min', 'fga_home', 'fgm_home', 'fga_2_home', 'fgm_2_home', 'fga_3_home',

@@ -1,12 +1,15 @@
 ''"""train_previous.py
 Usage:
-    train_previous.py <f_data_config>
+    train_previous.py <f_data_config> <f_model_config>
 
 Arguments:
     <f_data_config>  example ''lineups.yaml''
+    <f_data_config>  example ''abilities.yaml''
 
 Example:
-    train_previous.py lineups.yaml
+    train_previous.py lineups.yaml abilities.yaml
+    train_previous.py lineups.yaml previous.yaml
+    train_previous.py lineups.yaml adjusted.yaml
 """
 
 from __future__ import print_function
@@ -19,6 +22,8 @@ import importlib
 
 import lineup.config as CONFIG
 from lineup.model.abilities import Abilities
+from lineup.model.previous import Previous
+from lineup.model.adjusted import Adjusted
 
 def train(data_config, model_config, data):
     model = getattr(importlib.import_module(model_config['model']['module']), model_config['model']['model'])(
@@ -44,4 +49,3 @@ if __name__ == '__main__':
     matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'lineups-min.csv'))
 
     train(data_config=data_config, data=matchups, model_config=model_config)
-
