@@ -34,7 +34,7 @@ class Abilities:
         self.data_config = data_config
         self.model = getattr(importlib.import_module(self.model_config['sklearn']['module']), self.model_config['sklearn']['model'])()
 
-    def prep_data(self, data):
+    def prep_data(self):
         self.lineups = self.data
         self.home_abilities = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'home_abilities.csv'))
         self.away_abilities = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'away_abilities.csv'))

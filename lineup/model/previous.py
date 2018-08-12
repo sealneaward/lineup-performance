@@ -69,9 +69,6 @@ class Previous:
         matchups = pd.DataFrame()
         cols = _cols(self.data_config)
 
-        # debugging purposes
-        season = '2016'
-
         gameids = self.lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
         for game in tqdm(gameids):
             try:

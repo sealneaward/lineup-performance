@@ -1,6 +1,9 @@
 import pandas as pd
 import re
 import math
+import urllib2
+import lxml.html as LH
+from bs4 import BeautifulSoup
 
 PLAYER_RE = r'([A-Z].\s)\w+'
 
@@ -11,7 +14,65 @@ def _minute(play):
 	minute = (12 - int(play['TIME'].split(':')[0])) + ((int(play['QUARTER']) - 1) * 12) - 1
 	return minute
 
-def parse_nba_play(play):
+def _player_info(year):
+	"""
+	Get info on players for totals in single season
+
+	Parameters
+	----------
+	year: str
+		year id info
+
+	Returns
+	-------
+	player_data: panda.DataFrame
+		information on all members of home team
+
+	"""
+	# get home team id from game id
+	url = ('https://www.basketball-reference.com/leagues/NBA_{YEAR}_totals.html').format(YEAR=year)
+	player_data = pd.read_html(url)[0]
+	# delete unecessary rows
+	player_data = player_data.loc[player_data.Rk != 'Rk', :]
+	# get soup table, then input to pandas.read_html function
+	return player_data
+
+def roster(game):
+	"""
+	Parse team urls in game data to get home roster information in
+	F. LastName format
+
+	Parameters
+	----------
+	game: str
+		game id info
+
+	Returns
+	-------
+	home_roster: str list
+		information on all members of home team
+
+	"""
+	# get home team id from game id
+	team = game[-3:]
+	url = ('https://www.basketball-reference.com/teams/{TEAM}/2016.html').format(TEAM=team)
+	roster_info = pd.read_html(url)[0]
+	home_roster = []
+
+	for ind, player in roster_info.iterrows():
+		try:
+			first_name = str(player['Player']).split(' ')[0]
+			last_name = str(player['Player']).split(' ')[1:]
+			last_name = ' '.join(last_name)
+			name = '%s. %s' % (first_name[0], last_name)
+			home_roster.append(name)
+
+		except Exception:
+			continue
+
+	return home_roster
+
+def parse_nba_play(play, hm_roster):
 	"""Parse play details from a play-by-play string describing a play.
 	Assuming valid input, this function returns structured data in a dictionary
 	describing the play. If the play detail string was invalid, this function
@@ -70,7 +131,7 @@ def parse_nba_play(play):
 	p['fouler'] = None
 
 	# home roster
-	hm_roster = ['put team','roster', 'here']
+	# hm_roster = ['put team','roster', 'here']
 
 	# parsing field goal attempts
 	shotRE = (r'(?P<shooter>{0}) (?P<is_fgm>makes|misses) '

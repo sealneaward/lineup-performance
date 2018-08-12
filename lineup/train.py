@@ -31,7 +31,7 @@ def train(data_config, model_config, data):
         model_config=model_config,
         data=data
     )
-    # model.prep_data(data=data, home_abilities=home_abilities, away_abilities=away_abilities)
+#    model.prep_data()
     model.train()
     predictions = model.model.predict(model.val_x)
     print(classification_report(model.val_y, predictions))

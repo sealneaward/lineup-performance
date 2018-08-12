@@ -17,7 +17,7 @@ import yaml
 from tqdm import tqdm
 
 import lineup.config as CONFIG
-from lineup.data.utils import parse_nba_play
+from lineup.data.utils import parse_nba_play, roster
 
 class MatchupException(Exception):
 	pass
@@ -44,6 +44,7 @@ def _performance_vector(team_matchup_pbp, team):
 	Get performance vector
 	"""
 	fga = len(team_matchup_pbp.loc[team_matchup_pbp.is_fga == True, :])
+	fta = len(team_matchup_pbp.loc[team_matchup_pbp.is_fta == True, :])
 	fgm = len(team_matchup_pbp.loc[team_matchup_pbp.is_fgm == True, :])
 	fga_2 = len(team_matchup_pbp.loc[(team_matchup_pbp.is_fga == True) & (team_matchup_pbp.is_three == False), :])
 	fgm_2 = len(team_matchup_pbp.loc[(team_matchup_pbp.is_fgm == True) & (team_matchup_pbp.is_three == False), :])
@@ -55,6 +56,7 @@ def _performance_vector(team_matchup_pbp, team):
 	reb = len(team_matchup_pbp.loc[team_matchup_pbp.is_reb == True, :])
 	dreb = len(team_matchup_pbp.loc[team_matchup_pbp.is_dreb == True, :])
 	oreb = len(team_matchup_pbp.loc[team_matchup_pbp.is_oreb == True, :])
+	to = len(team_matchup_pbp.loc[team_matchup_pbp.is_to == True, :])
 	pts = fgm_2 * 2 + fgm_3 * 3
 	if fga > 0:
 		pct = (1.0 * fgm)/fga
@@ -69,9 +71,9 @@ def _performance_vector(team_matchup_pbp, team):
 	else:
 		pct_3 = 0.0
 
-	cols = ['fga', 'fgm', 'fga_2', 'fgm_2', 'fga_3', 'fgm_3', 'ast', 'blk', 'pf', 'reb', 'dreb', 'oreb', 'pts', 'pct', 'pct_2', 'pct_3']
+	cols = ['fga', 'fta', 'fgm', 'fga_2', 'fgm_2', 'fga_3', 'fgm_3', 'ast', 'blk', 'pf', 'reb', 'dreb', 'oreb', 'to', 'pts', 'pct', 'pct_2', 'pct_3']
 	cols = ['%s_%s' % (col, team) for col in cols]
-	data = [fga, fgm, fga_2, fgm_2, fga_3, fgm_3, ast, blk, pf, reb, dreb, oreb, pts, pct, pct_2, pct_3]
+	data = [fga, fta, fgm, fga_2, fgm_2, fga_3, fgm_3, ast, blk, pf, reb, dreb, oreb, to, pts, pct, pct_2, pct_3]
 
 	performance = pd.DataFrame(data=[data], columns=cols)
 	return performance
@@ -173,10 +175,13 @@ def _pbp(game):
 	pbp['QUARTER'] = pbp['QUARTER'].fillna(method='ffill')
 	pbp['GAME'] = game
 	pbp = pbp.loc[~pbp.TIME.isin(['Time', '1st Q', '2nd Q', '3rd Q', '4th Q']), :]
+
+	hm_roster = roster(game)
+
 	plays = []
 
 	for ind, play in pbp.iterrows():
-		play = parse_nba_play(play)
+		play = parse_nba_play(play, hm_roster)
 		if play is None:
 			continue
 		else:
