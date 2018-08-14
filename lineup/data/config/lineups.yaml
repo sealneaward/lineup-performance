@@ -30,9 +30,28 @@ lineup: [
 'away_0','away_1','away_2','away_3','away_4','away_team',
 'home_0','home_1','home_2','home_3','home_4','home_team'
 ]
+home_team: [
+'home_0','home_1','home_2','home_3','home_4'
+]
+away_team: [
+'away_0','away_1','away_2','away_3','away_4'
+]
+players: [
+'home_0','home_1','home_2','home_3','home_4',
+'away_0','away_1','away_2','away_3','away_4'
+]
+players_apm: [
+'home_0_apm','home_1_apm','home_2_apm','home_3_apm','home_4_apm',
+'away_0_apm','away_1_apm','away_2_apm','away_3_apm','away_4_apm'
+]
 abilities: [
 'fga_away','fgm_away','fga_2_away','fgm_2_away','fga_3_away','fgm_3_away',
 'ast_away','reb_away','dreb_away','oreb_away','pts_away','time_away','n_games_away',
 'fga_home','fgm_home','fga_2_home','fgm_2_home','fga_3_home','fgm_3_home',
 'ast_home','reb_home','dreb_home','oreb_home','pts_home','time_home','n_games_home', 'outcome'
+]
+adjusted: [
+'home_0_apm','home_1_apm','home_2_apm','home_3_apm','home_4_apm',
+'away_0_apm','away_1_apm','away_2_apm','away_3_apm','away_4_apm',
+'outcome'
 ]

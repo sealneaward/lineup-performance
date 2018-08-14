@@ -121,6 +121,10 @@ def _matchup_performances(matchups, pbp):
 	for ind, matchup in matchups.iterrows():
 		performance = _performance(matchup, pbp)
 		if not performance.empty:
+			if (int(performance['pts_home']) - int(performance['pts_visitor'])) > 0:
+				performance['outcome'] = 1
+			elif (int(performance['pts_home']) - int(performance['pts_visitor'])) <= 0:
+				performance['outcome'] = -1
 			performances = performances.append(performance)
 
 	performances = pd.concat([matchups, performances], axis=1)
