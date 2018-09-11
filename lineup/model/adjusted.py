@@ -9,8 +9,8 @@ from copy import copy
 
 import lineup.config as CONFIG
 from lineup.model.utils import *
-from lineup.data.nba.get_matchups import _pbp, _cols, _game_matchups, _performance_vector, _matchup_performances, MatchupException
-from lineup.data.utils import _player_info
+from lineup.data.nba.get_matchups import _pbp, MatchupException, _performance_vector
+from lineup.data.utils import _player_info, _game_id
 
 class TimeoutException(Exception):
     pass
@@ -31,7 +31,8 @@ class Adjusted:
     """
     Use adjusted plus minus data as input for model
     """
-    def __init__(self, data_config, model_config, data):
+    def __init__(self, data_config, model_config, data, year):
+        self.year = year
         self.data = data
         self.model_config = model_config
         self.data_config = data_config
@@ -39,15 +40,15 @@ class Adjusted:
 
     def prep_data(self):
         self.lineups = self.data
-        season = '2016'
-        player_info = _player_info(season)
+        player_info = _player_info(self.year)
         self.player_names = player_info['Player'].values
 
-        # self.matchups = self._matchups()
-        # self.matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-adjusted.csv'), index=False)
-        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-adjusted.csv'))
+        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-%s.csv' % self.year))
+        self.matchups = self._matchups()
+        self.matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-adjusted-%s.csv' % self.year), index=False)
+        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-adjusted-%s.csv' % self.year))
         self.fit_regression()
-        self.matchups_ridge.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-adjusted-regressed.csv'), index=False)
+        self.matchups_ridge.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-adjusted-regressed-%s.csv' % self.year), index=False)
         self.matchups = self.matchups_ridge
 
     def fit_regression(self):
@@ -75,7 +76,7 @@ class Adjusted:
                     player = matchup[player_col]
                     matchup_ridge[player_col] = player
                     matchup_ridge['%s_apm' % player_col] = self.player_params[player]
-                except Exception:
+                except Exception as err:
                     continue
 
             matchup_ridge['outcome'] = self.matchups.loc[ind, 'outcome']
@@ -86,7 +87,7 @@ class Adjusted:
         self.matchups_ridge['lineup_apm'] = self.matchups_ridge['lineup_apm'].values / 5
 
     def train(self):
-        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-adjusted-regressed.csv'))
+        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-adjusted-regressed-%s.csv' % self.year))
 
         # clean
         self.matchups = clean(self.data_config, self.matchups, 'adjusted')
@@ -113,22 +114,21 @@ class Adjusted:
         lineups: pandas.DataFrame
             information on single team lineup at time T
         """
-        season = '2016'
         matchups = pd.DataFrame()
-        player_info = _player_info(season)
+        player_info = _player_info(self.year)
 
-        gameids = self.lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
-
+        gameids = self.matchups.loc[:, 'game'].drop_duplicates(inplace=False).values
+        # gameids = gameids[:5]
         for game in tqdm(gameids):
             try:
                 with time_limit(30):
-                    pbp = _pbp(game)
-                    game_lineups = self.lineups.loc[self.lineups.game == game, :]
-                    game_matchups = _game_matchups(data_config=self.data_config, lineups=game_lineups, game=game, season=season, cols=_cols(self.data_config))
+                    game_id = _game_id(game)
+                    pbp = _pbp(game_id)
+                    game_matchups = self.matchups.loc[self.matchups.game == game, :]
                     if game_matchups.empty:
                         continue
 
-                    game_matchups = _matchup_performances(matchups=game_matchups, pbp=pbp)
+                    game_matchups = self._matchup_performances(matchups=game_matchups, pbp=pbp)
                     if game_matchups.empty:
                         continue
 
@@ -232,6 +232,56 @@ class Adjusted:
             margins.append(100*(hv-av))
 
         return pd.Series(margins).values
+
+    def _matchup_performances(self, matchups, pbp):
+        """
+        Create performance vectors for each of the matchups
+
+        Parameters
+        ----------
+        matchups: pandas.DataFrame
+            time in/out of lineup matchups
+        pbp: pandas.DataFrame
+            events in game with timestamps
+
+        Returns
+        -------
+        matchups_performance: pandas.DataFrame
+            performance vectors
+        """
+        performances = pd.DataFrame()
+
+        i = 0
+        for ind, matchup in matchups.iterrows():
+            performance = self._performance(matchup, pbp)
+            if not performance.empty:
+                if (int(performance['pts_home']) - int(performance['pts_visitor'])) > 0:
+                    matchup['outcome'] = 1
+                elif (int(performance['pts_home']) - int(performance['pts_visitor'])) <= 0:
+                    matchup['outcome'] = -1
+                performances = performances.append(matchup)
+
+        return performances
+
+    def _performance(self, matchup, pbp):
+        """
+        Get performance for single matchup
+        """
+        starting_min = matchup['starting_minute']
+        end_min = matchup['end_minute']
+        matchup_pbp = pbp.loc[(pbp.minute >= starting_min) & (pbp.minute <= end_min), :]
+
+        # get totals for home
+        team_matchup_pbp = matchup_pbp.loc[matchup_pbp.home == True, :]
+        performance_home = _performance_vector(team_matchup_pbp, 'home')
+
+        # get totals for visitor
+        team_matchup_pbp = matchup_pbp.loc[matchup_pbp.home == False, :]
+        performance_away = _performance_vector(team_matchup_pbp, 'visitor')
+
+        performance = pd.concat([performance_home, performance_away], axis=1)
+
+        return performance
 
     def _one_hot_player(self, game_matchups, player_info, threshold=388):
         """

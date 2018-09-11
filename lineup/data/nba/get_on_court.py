@@ -22,6 +22,7 @@ import yaml
 import re
 from itertools import izip
 import urllib2
+from tqdm import tqdm
 
 import lineup.config as CONFIG
 
@@ -183,7 +184,7 @@ def generate_player_dictionary(team_page_link):
     return player_dict
 
 
-def main_plus_minus(data_config):
+def main_plus_minus(data_config, year):
     """
     Uses basketball-reference endpoints to get 5 player lineups
     when they get off and on the court for different teams
@@ -197,75 +198,72 @@ def main_plus_minus(data_config):
         scraping config
     """
     today = datetime.now().date()
-    years = data_config['years']
     on_court = pd.DataFrame()
 
-    years = years[:1]
-    for year in years:
-        print("DOING YEAR " + year)
-        link = "http://www.basketball-reference.com/leagues/NBA_" + year + ".html"
-        response = urllib2.urlopen(urllib2.Request(link, headers={'User-Agent': 'Mozilla'})).read()
-        season_summary = BeautifulSoup(response, 'lxml')
-        comments = season_summary.findAll(text=lambda text: isinstance(text, Comment))
-        for comment in comments:
-            comment_string = re.split("(?:<!--)|(?:-->)", comment)[0]
-            comment_soup = BeautifulSoup(comment_string, "lxml")
-            team_stats = comment_soup.find("table", {"id": "team-stats-per_game"})
-            if team_stats:
-                team_names = team_stats.find("tbody").findAll("td", {"data-stat": "team_name"})
-                for team_name in team_names:
-                    team_page_link = team_name.find("a")['href']
-                    abr_regex = re.compile("^\/teams\/(.*)\/.*\.html")
-                    team_abr = abr_regex.search(team_page_link).group(1)
+    print("DOING YEAR " + year)
+    link = "http://www.basketball-reference.com/leagues/NBA_" + year + ".html"
+    response = urllib2.urlopen(urllib2.Request(link, headers={'User-Agent': 'Mozilla'})).read()
+    season_summary = BeautifulSoup(response, 'lxml')
+    comments = season_summary.findAll(text=lambda text: isinstance(text, Comment))
+    for comment in comments:
+        comment_string = re.split("(?:<!--)|(?:-->)", comment)[0]
+        comment_soup = BeautifulSoup(comment_string, "lxml")
+        team_stats = comment_soup.find("table", {"id": "team-stats-per_game"})
+        if team_stats:
+            team_names = team_stats.find("tbody").findAll("td", {"data-stat": "team_name"})
+            for team_name in tqdm(team_names):
+                team_page_link = team_name.find("a")['href']
+                abr_regex = re.compile("^\/teams\/(.*)\/.*\.html")
+                team_abr = abr_regex.search(team_page_link).group(1)
 
-                    players = generate_player_dictionary(team_page_link)
-                    schedule_link = "http://www.basketball-reference.com/teams/" + team_abr + "/" + year + "_games.html"
-                    response = urllib2.urlopen(urllib2.Request(schedule_link, headers={'User-Agent': 'Mozilla'})).read()
-                    schedule_soup = BeautifulSoup(response, 'lxml')
-                    game_rows = schedule_soup.find("table", {"id": "games"}).find("tbody").findAll("tr",
-                                                                                                   {"class": None})
-                    print("Working on " + team_abr)
-                    gamesPlayed = 0.0
-                    for game_row in game_rows:
-                        gameDate = datetime.strptime(game_row.find("td", {"data-stat": "date_game"})['csk'],
-                                                     "%Y-%m-%d").date()
-                        if gameDate >= today:
-                            print("Breaking due to date")
-                            break
-                        else:
-                            game_link = game_row.find("td", {"data-stat": "box_score_text"}).find("a")['href']
-                            gameID_regex = re.compile('^/boxscores/([^.]+).html')
-                            gameID = gameID_regex.search(game_link).group(1)
+                players = generate_player_dictionary(team_page_link)
+                schedule_link = "http://www.basketball-reference.com/teams/" + team_abr + "/" + year + "_games.html"
+                response = urllib2.urlopen(urllib2.Request(schedule_link, headers={'User-Agent': 'Mozilla'})).read()
+                schedule_soup = BeautifulSoup(response, 'lxml')
+                game_rows = schedule_soup.find("table", {"id": "games"}).find("tbody").findAll("tr",
+                                                                                               {"class": None})
+                print("Working on " + team_abr)
+                gamesPlayed = 0.0
+                for game_row in game_rows:
+                    gameDate = datetime.strptime(game_row.find("td", {"data-stat": "date_game"})['csk'],
+                                                 "%Y-%m-%d").date()
+                    if gameDate >= today:
+                        print("Breaking due to date")
+                        break
+                    else:
+                        game_link = game_row.find("td", {"data-stat": "box_score_text"}).find("a")['href']
+                        gameID_regex = re.compile('^/boxscores/([^.]+).html')
+                        gameID = gameID_regex.search(game_link).group(1)
 
-                            isHomeGame = not game_row.find("td", {"data-stat": "game_location"}).text == "@"
+                        isHomeGame = not game_row.find("td", {"data-stat": "game_location"}).text == "@"
 
-                            overtime_string = game_row.find("td", {"data-stat": "overtimes"}).text
-                            num_overtimes = 0
-                            if overtime_string:
-                                if overtime_string == "OT":
-                                    num_overtimes = 1
-                                else:
-                                    num_overtimes = int(overtime_string[0])
-                            plus_minus_link = "http://www.basketball-reference.com/boxscores/plus-minus/" + gameID + ".html"
-
-                            team_on_off_game = process_plus_minus(
-                                plus_minus_link,
-                                isHomeGame,
-                                num_overtimes,
-                                players,
-                                team_abr,
-                                gameID,
-                                year
-                            )
-                            if team_on_off_game.empty:
-                                print("Empty response")
-                                continue
+                        overtime_string = game_row.find("td", {"data-stat": "overtimes"}).text
+                        num_overtimes = 0
+                        if overtime_string:
+                            if overtime_string == "OT":
+                                num_overtimes = 1
                             else:
-                                # process the return
-                                on_court = on_court.append(team_on_off_game)
-                            gamesPlayed += 1.0
+                                num_overtimes = int(overtime_string[0])
+                        plus_minus_link = "http://www.basketball-reference.com/boxscores/plus-minus/" + gameID + ".html"
 
-    on_court.to_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'on_court_players.csv'), index=False)
+                        team_on_off_game = process_plus_minus(
+                            plus_minus_link,
+                            isHomeGame,
+                            num_overtimes,
+                            players,
+                            team_abr,
+                            gameID,
+                            year
+                        )
+                        if team_on_off_game.empty:
+                            print("Empty response")
+                            continue
+                        else:
+                            # process the return
+                            on_court = on_court.append(team_on_off_game)
+                        gamesPlayed += 1.0
+
+    on_court.to_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'on_court_players-%s.csv' % year), index=False)
 
 if __name__ == '__main__':
     arguments = docopt(__doc__)
@@ -275,4 +273,7 @@ if __name__ == '__main__':
 
     f_data_config = '%s/%s' % (CONFIG.data.config.dir, arguments['<f_data_config>'])
     data_config = yaml.load(open(f_data_config, 'rb'))
-    main_plus_minus(data_config)
+
+    years = data_config['years']
+    for year in years:
+        main_plus_minus(data_config=data_config, year=year)

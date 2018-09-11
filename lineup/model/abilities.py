@@ -3,9 +3,12 @@ import pandas as pd
 from tqdm import tqdm
 from contextlib import contextmanager
 import signal
+from matplotlib import pyplot as plt
+from matplotlib import cm as cm
 from sklearn.model_selection import train_test_split
 
 import lineup.config as CONFIG
+from lineup.data.utils import _game_id
 from lineup.model.utils import *
 from lineup.data.nba.get_matchups import _pbp, _cols, _game_matchups, _performance_vector, MatchupException
 
@@ -28,21 +31,22 @@ class Abilities:
     """
     Use previous lineup/matchup data as input for model
     """
-    def __init__(self, data_config, model_config, data):
+    def __init__(self, data_config, model_config, data, year):
+        self.year = year
         self.data = data
         self.model_config = model_config
         self.data_config = data_config
         self.model = getattr(importlib.import_module(self.model_config['sklearn']['module']), self.model_config['sklearn']['model'])()
+        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-%s.csv' % self.year))
 
     def prep_data(self):
-        self.lineups = self.data
-        self.home_abilities = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'home_abilities.csv'))
-        self.away_abilities = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'away_abilities.csv'))
+        self.home_abilities = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'home_abilities-%s.csv' % self.year))
+        self.away_abilities = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'away_abilities-%s.csv' % self.year))
         self.matchups = self._matchups()
-        self.matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-abilities.csv'), index=False)
+        self.matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-abilities-%s.csv' % self.year), index=False)
 
     def train(self):
-        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-abilities.csv'))
+        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-abilities-%s.csv' % self.year))
 
         # clean
         self.matchups = clean(self.data_config, self.matchups, 'abilities')
@@ -60,7 +64,7 @@ class Abilities:
         """
         Form lineup matches for embedding purposes.
         For each minute form ten man lineup consisting of team A and team B at time T
-        Each matchup contains the abilites of the lineups.
+        Each matchup contains the abilities of the lineups.
 
         Parameters
         ----------
@@ -72,19 +76,17 @@ class Abilities:
         matchups = pd.DataFrame()
         cols = _cols(self.data_config)
 
-        # debugging purposes
-        season = '2016'
-
-        gameids = self.lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
+        gameids = self.matchups.loc[:, 'game'].drop_duplicates(inplace=False).values
+        # gameids = gameids[:5]
         for game in tqdm(gameids):
             try:
                 with time_limit(30):
-                    pbp = _pbp(game)
-                    game_lineups = self.lineups.loc[self.lineups.game == game, :]
-                    game_matchups = _game_matchups(data_config=self.data_config, lineups=game_lineups, cols=cols, game=game, season=season)
+                    game_id = _game_id(game)
+                    pbp = _pbp(game_id)
+                    game_matchups = self.matchups.loc[self.matchups.game == game, :]
                     if game_matchups.empty:
                         continue
-                    game_matchups = self._matchup_performances(matchups=game_matchups, lineups=game_lineups, pbp=pbp)
+                    game_matchups = self._matchup_performances(matchups=game_matchups, pbp=pbp)
                     if game_matchups.empty:
                         continue
                     matchups = matchups.append(game_matchups)
@@ -95,7 +97,7 @@ class Abilities:
 
         return matchups
 
-    def _matchup_performances(self, matchups, lineups, pbp):
+    def _matchup_performances(self, matchups, pbp):
         """
         Create performance vectors for each of the matchups
 
@@ -134,10 +136,6 @@ class Abilities:
         """
         Get abilities for single matchup
         """
-        abilities = pd.DataFrame()
-        home_ability = pd.DataFrame()
-        away_ability = pd.DataFrame()
-
         home_ability = self.home_abilities.loc[
            (self.home_abilities['home_0'] == matchup['home_0']) &
            (self.home_abilities['home_1'] == matchup['home_1']) &
@@ -152,10 +150,13 @@ class Abilities:
            (self.away_abilities['away_2'] == matchup['away_2']) &
            (self.away_abilities['away_3'] == matchup['away_3']) &
            (self.away_abilities['away_4'] == matchup['away_4'])
-        , :
+        ,:
         ]
 
         if home_ability.empty or away_ability.empty:
+            raise MatchupException
+
+        if home_ability.isnull().values.any() or away_ability.isnull().values.any():
             raise MatchupException
 
         home_data = home_ability.values[0]
@@ -179,8 +180,8 @@ class Abilities:
         """
         Get performance for single matchup
         """
-        starting_min = matchup['starting_min']
-        end_min = matchup['end_min']
+        starting_min = matchup['starting_minute']
+        end_min = matchup['end_minute']
         matchup_pbp = pbp.loc[(pbp.minute >= starting_min) & (pbp.minute <= end_min), :]
 
         # get totals for home

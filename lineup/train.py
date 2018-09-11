@@ -25,11 +25,12 @@ from lineup.model.abilities import Abilities
 from lineup.model.previous import Previous
 from lineup.model.adjusted import Adjusted
 
-def train(data_config, model_config, data):
+def train(data_config, model_config, data, year):
     model = getattr(importlib.import_module(model_config['model']['module']), model_config['model']['model'])(
         data_config=data_config,
         model_config=model_config,
-        data=data
+        data=data,
+        year=year
     )
     model.prep_data()
     model.train()
@@ -47,6 +48,8 @@ if __name__ == '__main__':
     data_config = yaml.load(open(f_data_config, 'rb'))
     f_model_config = '%s/%s' % (CONFIG.model.config.dir, arguments['<f_model_config>'])
     model_config = yaml.load(open(f_model_config, 'rb'))
-    matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'lineups-min.csv'))
 
-    train(data_config=data_config, data=matchups, model_config=model_config)
+    years = data_config['years']
+    for year in years:
+        lineups = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'lineups-%s.csv' % year))
+        train(data_config=data_config, data=lineups, model_config=model_config, year=year)

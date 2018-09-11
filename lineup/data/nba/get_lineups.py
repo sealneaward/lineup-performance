@@ -181,9 +181,8 @@ if __name__ == '__main__':
     f_data_config = '%s/%s' % (CONFIG.data.config.dir, arguments['<f_data_config>'])
     data_config = yaml.load(open(f_data_config, 'rb'))
 
-    on_court = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'on_court_players.csv'))
-    lineups = _lineups(on_court, data_config)
-    if data_config['time_seperator'] == 'min':
-        lineups.to_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'lineups-min.csv'), index=False)
-    else:
-        lineups.to_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'lineups-sec.csv'), index=False)
+    years = data_config['years']
+    for year in years:
+        on_court = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'on_court_players-%s.csv' % year))
+        lineups = _lineups(on_court=on_court, data_config=data_config)
+        lineups.to_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'lineups-%s.csv' % year), index=False)

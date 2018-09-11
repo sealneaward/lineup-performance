@@ -25,7 +25,7 @@ def _abilities(lineup, matchups, type):
     Get ratings for lineup
     """
     matchups = matchups.loc[matchups['%s_lineup' % type] == lineup]
-    matchups['time_played'] = matchups['end_min'] - matchups['starting_min'] + 1
+    matchups['time_played'] = matchups['end_minute'] - matchups['starting_minute'] + 1
     team = matchups['%s_team' % (type)].values[0]
     n_games = len(matchups.loc[matchups['%s_team' % (type)] == team, 'game'].drop_duplicates(inplace=False))
     lineup = matchups[['%s_%s' % (type, ind) for ind in range(5)]].drop_duplicates(inplace=False)
@@ -59,6 +59,8 @@ def _abilities(lineup, matchups, type):
     abilities = abilities.reset_index(drop=True)
 
     lineup_abilities = pd.concat([lineup, abilities], axis=1)
+    if lineup_abilities.isnull().values.any():
+        return pd.DataFrame()
 
     return lineup_abilities
 
@@ -106,10 +108,14 @@ def _matchup_abilities(matchups):
 
     for lineup in tqdm(home_lineups):
         lineup_abilities = _abilities(lineup, matchups, 'home')
+        if lineup_abilities.isnull().values.any() or lineup_abilities.empty:
+            continue
         home_abilities = home_abilities.append(lineup_abilities)
 
     for lineup in tqdm(away_lineups):
         lineup_abilities = _abilities(lineup, matchups, 'away')
+        if lineup_abilities.isnull().values.any() or lineup_abilities.empty:
+            continue
         away_abilities = away_abilities.append(lineup_abilities)
 
     return home_abilities, away_abilities
@@ -134,9 +140,11 @@ if __name__ == '__main__':
     f_data_config = '%s/%s' % (CONFIG.data.config.dir, arguments['<f_data_config>'])
     data_config = yaml.load(open(f_data_config, 'rb'))
 
-    matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups.csv'))
-    home_abilities, away_abilities = _matchup_abilities(matchups)
-    home_abilities.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'home_abilities.csv'), index=False)
-    away_abilities.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'away_abilities.csv'), index=False)
+    years = data_config['years']
+    for year in years:
+        matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-%s.csv' % year))
+        home_abilities, away_abilities = _matchup_abilities(matchups)
+        home_abilities.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'home_abilities-%s.csv' % year), index=False)
+        away_abilities.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'away_abilities-%s.csv' % year), index=False)
 
     # clean()

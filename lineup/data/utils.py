@@ -5,6 +5,8 @@ import urllib2
 import lxml.html as LH
 from bs4 import BeautifulSoup
 
+import lineup.config as CONFIG
+
 PLAYER_RE = r'([A-Z].\s)\w+'
 
 def _minute(play):
@@ -36,6 +38,27 @@ def _player_info(year):
 	player_data = player_data.loc[player_data.Rk != 'Rk', :]
 	# get soup table, then input to pandas.read_html function
 	return player_data
+	# else:
+	#     # get player info from basketball_value folders
+	#     player_data = pd.read_csv('%s/%s/%s' % (CONFIG.data.nba.matchups.bv.dir, year, 'players.csv'))
+	#     player_data['Player'] = ''
+	#
+	#     # this data is really dirty and needs to delete duplicates and leave names with . in it
+	#     duplicate_players = player_data[player_data.duplicated(subset=['PlayerID'], keep=False)]
+	#     duplicate_players = duplicate_players.groupby(by=['PlayerID'])
+	#     for x, duplicate_player in duplicate_players:
+	#         for y, player in duplicate_player.iterrows():
+	#             if '.' in player['PlayerName']:
+	#                 # found the optimal name
+	#                 break
+	#             else:
+	#                 continue
+	#         player_data.loc[player_data.PlayerID == player['PlayerID'], 'PlayerName'] = player['PlayerName']
+	#         player_data.loc[player_data.PlayerID == player['PlayerID'], 'Player'] = player['PlayerFirstName'] + ' ' + player['PlayerLastName']
+	#
+	#     player_data.drop_duplicates(subset=['PlayerID', 'PlayerName'], inplace=True)
+	#     player_data['Player'] = player_data['PlayerFirstName'] + ' ' + player_data['PlayerLastName']
+	#     return player_data
 
 def roster(game):
 	"""
@@ -71,6 +94,17 @@ def roster(game):
 			continue
 
 	return home_roster
+
+
+def _game_id(game):
+	"""
+	Format game id for basketball reference format
+	"""
+	home = game[-3:]
+	date = '%s0' % game[:-6]
+	game = '%s%s' % (date, home)
+	return game
+
 
 def parse_nba_play(play, hm_roster):
 	"""Parse play details from a play-by-play string describing a play.

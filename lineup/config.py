@@ -15,6 +15,9 @@ data.nhl.dir = "%s/%s" % (data.dir, "nhl")
 data.nba.matchups = ConfigSection("matchups")
 data.nba.matchups.dir = "%s/%s" % (data.nba.dir, "matchups")
 
+data.nba.matchups.bv = ConfigSection("basketball_value")
+data.nba.matchups.bv.dir = "%s/%s" % (data.nba.matchups.dir, "basketball_value")
+
 data.nba.lineups = ConfigSection("lineups")
 data.nba.lineups.dir = "%s/%s" % (data.nba.dir, "lineups")
 
