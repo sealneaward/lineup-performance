@@ -50,8 +50,7 @@ abilities: [
 'ast_home','reb_home','dreb_home','oreb_home','pts_home','time_home','n_games_home', 'outcome'
 ]
 adjusted: [
-'home_0_apm','home_1_apm','home_2_apm','home_3_apm','home_4_apm',
-'away_0_apm','away_1_apm','away_2_apm','away_3_apm','away_4_apm',
+'lineup_apm',
 'outcome'
 ]
 basketball_value:
@@ -69,4 +68,4 @@ basketball_value:
   EndTime: 'end_minute'
   GameID: 'game'
 years: ['2007','2008','2009','2010','2011','2012', '2013', '2014', '2015','2016']
-
+even_training: True

@@ -2,12 +2,49 @@ import pandas as pd
 import re
 import math
 import urllib2
+import numpy as np
 import lxml.html as LH
 from bs4 import BeautifulSoup
 
 import lineup.config as CONFIG
 
 PLAYER_RE = r'([A-Z].\s)\w+'
+
+def _even_split(x, y):
+	pos_y = y[y == 1]
+	neg_y = y[y == -1]
+	pos_x = x[y == 1]
+	neg_x = x[y == -1]
+
+	if len(pos_y) > len(neg_y):
+		pos_y = pos_y[:len(neg_y) + 1]
+		pos_x = pos_x[:len(neg_y) + 1]
+	elif len(neg_y) > len(pos_y):
+		neg_y = neg_y[:len(pos_y) + 1]
+		neg_x = neg_x[:len(pos_y) + 1]
+
+	# pos_inds = range(len(pos_y))
+	# neg_inds = range(len(neg_y))
+	# np.random.shuffle(pos_inds)
+	# np.random.shuffle(neg_inds)
+    #
+	# pos_y = pos_y[pos_inds]
+	# neg_y = neg_y[neg_inds]
+	# pos_x = pos_x[pos_inds]
+	# neg_x = neg_x[neg_inds]
+
+	y = np.concatenate([pos_y, neg_y])
+	x = np.concatenate([pos_x, neg_x])
+
+	return x, y
+
+
+def shuffle_2_array(x, y):
+	randomize = np.arange(len(x))
+	np.random.shuffle(randomize)
+	x = x[randomize]
+	y = y[randomize]
+	return x, y
 
 def _minute(play):
 	"""

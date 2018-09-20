@@ -6,3 +6,4 @@ lineup.egg-info/**
 .idea/**
 venv/**
 *.csv
+*.csv#

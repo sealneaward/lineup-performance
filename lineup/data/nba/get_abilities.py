@@ -15,6 +15,8 @@ import pandas as pd
 from docopt import docopt
 import yaml
 from tqdm import tqdm
+import os
+
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -25,7 +27,7 @@ def _abilities(lineup, matchups, type):
     Get ratings for lineup
     """
     matchups = matchups.loc[matchups['%s_lineup' % type] == lineup]
-    matchups['time_played'] = matchups['end_minute'] - matchups['starting_minute'] + 1
+    matchups['time_played'] = matchups['end_min'] - matchups['starting_min'] + 1
     team = matchups['%s_team' % (type)].values[0]
     n_games = len(matchups.loc[matchups['%s_team' % (type)] == team, 'game'].drop_duplicates(inplace=False))
     lineup = matchups[['%s_%s' % (type, ind) for ind in range(5)]].drop_duplicates(inplace=False)
@@ -142,9 +144,16 @@ if __name__ == '__main__':
 
     years = data_config['years']
     for year in years:
-        matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-%s.csv' % year))
-        home_abilities, away_abilities = _matchup_abilities(matchups)
-        home_abilities.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'home_abilities-%s.csv' % year), index=False)
-        away_abilities.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'away_abilities-%s.csv' % year), index=False)
+        if (
+            os.path.isfile('%s/%s' % (CONFIG.data.nba.matchups.dir, 'home_abilities-%s.csv' % year)) and
+            os.path.isfile('%s/%s' % (CONFIG.data.nba.matchups.dir, 'away_abilities-%s.csv' % year)) and
+            False
+        ):
+            continue
+        else:
+            matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-%s.csv' % year))
+            home_abilities, away_abilities = _matchup_abilities(matchups)
+            home_abilities.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'home_abilities-%s.csv' % year), index=False)
+            away_abilities.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'away_abilities-%s.csv' % year), index=False)
 
     # clean()

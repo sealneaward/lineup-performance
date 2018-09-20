@@ -263,6 +263,24 @@ def clean_teams(year):
     matchups['away_team'] = matchups['game'].str[-6:-3]
     matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-%s.csv' % year), index=False)
 
+def eval_bv(matchups, year):
+    performances = []
+    matchups['Performance'] = 0
+    for ind, matchup in matchups.iterrows():
+        performance = {}
+        if (int(matchup['PointsScoredHome']) - int(matchup['PointsScoredAway'])) > 0:
+            performance['outcome'] = 1
+        elif (int(matchup['PointsScoredHome']) - int(matchup['PointsScoredAway'])) <= 0:
+            performance['outcome'] = -1
+        performances.append(performance)
+
+    performances = pd.DataFrame.from_records(performances)
+    n_pos = len(performances.loc[performances.outcome == 1, :])
+    n_neg = len(performances.loc[performances.outcome == -1, :])
+
+    print('Percent of positives in %s: %s' % (year, str(float((n_pos * 1.0) / (n_pos + n_neg)))))
+
+
 if __name__ == '__main__':
     arguments = docopt(__doc__)
     print("...Docopt... ")
@@ -277,7 +295,9 @@ if __name__ == '__main__':
     years = [year.split('/')[-1] for year in years]
     for year in years:
         matchups = pd.read_csv('%s/%s/matchups.csv' % (bv_dir, year), sep='\t')
-        # pbp = pd.read_csv('%s/%s/playbyplay.csv' % (bv_dir, year), sep='\t')
+        # eval_bv(matchups, year)
+
+        # # pbp = pd.read_csv('%s/%s/playbyplay.csv' % (bv_dir, year), sep='\t')
         matchups = _matchups(data_config, matchups, year)
         matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-%s.csv' % year), index=False)
 

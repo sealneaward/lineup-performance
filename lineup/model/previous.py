@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 
 import lineup.config as CONFIG
 from lineup.model.utils import *
+from lineup.data.utils import _even_split, shuffle_2_array
 from lineup.data.nba.get_matchups import _pbp, _cols, _game_matchups, _performance_vector, MatchupException
 
 class TimeoutException(Exception):
@@ -28,8 +29,10 @@ class Previous:
     """
     Use previous lineup/matchup data as input for model
     """
-    def __init__(self, data_config, model_config, data):
+    def __init__(self, data_config, model_config, data, year):
+        self.year = year
         self.data = data
+        self.pbp = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'pbp-%s.csv' % self.year))
         self.model_config = model_config
         self.data_config = data_config
         self.model = getattr(importlib.import_module(self.model_config['sklearn']['module']), self.model_config['sklearn']['model'])()
@@ -37,10 +40,10 @@ class Previous:
     def prep_data(self):
         self.lineups = self.data
         self.matchups = self._matchups()
-        self.matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-previous.csv'), index=False)
+        self.matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-previous-%s.csv' % self.year), index=False)
 
     def train(self):
-        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-previous.csv'))
+        self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-previous-%s.csv' % self.year))
 
         # clean
         self.matchups = clean(self.data_config, self.matchups, 'previous')
@@ -50,6 +53,14 @@ class Previous:
         self.matchups.drop(['outcome'], axis=1, inplace=True)
         X = self.matchups
         self.train_x, self.val_x, self.train_y, self.val_y = train_test_split(X, Y, test_size=self.data_config['split'])
+
+        if self.data_config['even_training']:
+            # ensure 50/50 split
+            self.train_x, self.train_y = _even_split(self.train_x, self.train_y)
+            self.val_x, self.val_y = _even_split(self.val_x, self.val_y)
+
+            self.train_x, self.train_y = shuffle_2_array(self.train_x, self.train_y)
+            self.val_x, self.val_y = shuffle_2_array(self.val_x, self.val_y)
 
         self.model.fit(self.train_x, self.train_y)
 
@@ -68,15 +79,14 @@ class Previous:
         """
         matchups = pd.DataFrame()
         cols = _cols(self.data_config)
-        season = '2016'
 
         gameids = self.lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
         for game in tqdm(gameids):
             try:
                 with time_limit(30):
-                    pbp = _pbp(game)
+                    pbp = self.pbp.loc[self.pbp.game == game, :]
                     game_lineups = self.lineups.loc[self.lineups.game == game, :]
-                    game_matchups = _game_matchups(data_config=self.data_config, lineups=game_lineups, cols=cols, game=game, season=season)
+                    game_matchups = _game_matchups(data_config=self.data_config, lineups=game_lineups, cols=cols, game=game, season=self.year)
                     if game_matchups.empty:
                         continue
                     game_matchups = self._matchup_performances(matchups=game_matchups, lineups=game_lineups, pbp=pbp)

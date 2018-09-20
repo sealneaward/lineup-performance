@@ -10,7 +10,7 @@ from copy import copy
 import lineup.config as CONFIG
 from lineup.model.utils import *
 from lineup.data.nba.get_matchups import _pbp, MatchupException, _performance_vector
-from lineup.data.utils import _player_info, _game_id
+from lineup.data.utils import _player_info, _game_id, _even_split, shuffle_2_array
 
 class TimeoutException(Exception):
     pass
@@ -34,6 +34,7 @@ class Adjusted:
     def __init__(self, data_config, model_config, data, year):
         self.year = year
         self.data = data
+        self.pbp = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'pbp-%s.csv' % self.year))
         self.model_config = model_config
         self.data_config = data_config
         self.model = getattr(importlib.import_module(self.model_config['sklearn']['module']), self.model_config['sklearn']['model'])()
@@ -99,6 +100,15 @@ class Adjusted:
         X = self.matchups
         self.train_x, self.val_x, self.train_y, self.val_y = train_test_split(X, Y, test_size=self.data_config['split'])
 
+        if self.data_config['even_training']:
+            # ensure 50/50 split
+            self.train_x, self.train_y = _even_split(self.train_x, self.train_y)
+            self.val_x, self.val_y = _even_split(self.val_x, self.val_y)
+
+            self.train_x, self.train_y = shuffle_2_array(self.train_x, self.train_y)
+            self.val_x, self.val_y = shuffle_2_array(self.val_x, self.val_y)
+
+
         self.model.fit(self.train_x, self.train_y)
 
 
@@ -122,8 +132,7 @@ class Adjusted:
         for game in tqdm(gameids):
             try:
                 with time_limit(30):
-                    game_id = _game_id(game)
-                    pbp = _pbp(game_id)
+                    pbp = self.pbp.loc[self.pbp.game == game, :]
                     game_matchups = self.matchups.loc[self.matchups.game == game, :]
                     if game_matchups.empty:
                         continue
@@ -267,8 +276,8 @@ class Adjusted:
         """
         Get performance for single matchup
         """
-        starting_min = matchup['starting_minute']
-        end_min = matchup['end_minute']
+        starting_min = matchup['starting_min']
+        end_min = matchup['end_min']
         matchup_pbp = pbp.loc[(pbp.minute >= starting_min) & (pbp.minute <= end_min), :]
 
         # get totals for home

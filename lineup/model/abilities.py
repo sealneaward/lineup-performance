@@ -5,10 +5,11 @@ from contextlib import contextmanager
 import signal
 from matplotlib import pyplot as plt
 from matplotlib import cm as cm
+import numpy as np
 from sklearn.model_selection import train_test_split
 
 import lineup.config as CONFIG
-from lineup.data.utils import _game_id
+from lineup.data.utils import _game_id, _even_split, shuffle_2_array
 from lineup.model.utils import *
 from lineup.data.nba.get_matchups import _pbp, _cols, _game_matchups, _performance_vector, MatchupException
 
@@ -34,6 +35,7 @@ class Abilities:
     def __init__(self, data_config, model_config, data, year):
         self.year = year
         self.data = data
+        self.pbp = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'pbp-%s.csv' % self.year))
         self.model_config = model_config
         self.data_config = data_config
         self.model = getattr(importlib.import_module(self.model_config['sklearn']['module']), self.model_config['sklearn']['model'])()
@@ -47,15 +49,23 @@ class Abilities:
 
     def train(self):
         self.matchups = pd.read_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-abilities-%s.csv' % self.year))
-
+        self.matchups.dropna(inplace=True)
         # clean
         self.matchups = clean(self.data_config, self.matchups, 'abilities')
-
         # split to train and test split
-        Y = self.matchups['outcome']
+        Y = self.matchups['outcome'].values
         self.matchups.drop(['outcome'], axis=1, inplace=True)
-        X = self.matchups
+        X = self.matchups.values
         self.train_x, self.val_x, self.train_y, self.val_y = train_test_split(X, Y, test_size=self.data_config['split'])
+
+        if self.data_config['even_training']:
+            # ensure 50/50 split
+            self.train_x, self.train_y = _even_split(self.train_x, self.train_y)
+            self.val_x, self.val_y = _even_split(self.val_x, self.val_y)
+
+            self.train_x, self.train_y = shuffle_2_array(self.train_x, self.train_y)
+            self.val_x, self.val_y = shuffle_2_array(self.val_x, self.val_y)
+
 
         self.model.fit(self.train_x, self.train_y)
 
@@ -81,8 +91,7 @@ class Abilities:
         for game in tqdm(gameids):
             try:
                 with time_limit(30):
-                    game_id = _game_id(game)
-                    pbp = _pbp(game_id)
+                    pbp = self.pbp.loc[self.pbp.game == game, :]
                     game_matchups = self.matchups.loc[self.matchups.game == game, :]
                     if game_matchups.empty:
                         continue
@@ -180,8 +189,8 @@ class Abilities:
         """
         Get performance for single matchup
         """
-        starting_min = matchup['starting_minute']
-        end_min = matchup['end_minute']
+        starting_min = matchup['starting_min']
+        end_min = matchup['end_min']
         matchup_pbp = pbp.loc[(pbp.minute >= starting_min) & (pbp.minute <= end_min), :]
 
         # get totals for home

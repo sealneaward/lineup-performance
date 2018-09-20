@@ -17,7 +17,7 @@ from __future__ import print_function
 import pandas as pd
 from docopt import docopt
 import yaml
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, accuracy_score
 import importlib
 
 import lineup.config as CONFIG
@@ -33,10 +33,11 @@ def train(data_config, model_config, data, year):
         year=year
     )
     model.prep_data()
-    model.train()
-
-    predictions = model.model.predict(model.val_x)
-    print(classification_report(model.val_y, predictions))
+    # model.train()
+    #
+    # predictions = model.model.predict(model.val_x)
+    # print(classification_report(model.val_y, predictions))
+    # print(accuracy_score(model.val_y, predictions))
 
 if __name__ == '__main__':
     arguments = docopt(__doc__)

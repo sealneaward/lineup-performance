@@ -1,12 +1,12 @@
-"""get_matchups.py
+"""get_lineups.py
 Usage:
-    get_matchups.py <f_data_config>
+    get_lineups.py <f_data_config>
 
 Arguments:
     <f_data_config>  example ''lineups.yaml''
 
 Example:
-    get_matchups.py lineups.yaml
+    get_lineups.py lineups.yaml
 """
 
 from __future__ import print_function
@@ -233,7 +233,7 @@ def _game_matchups(data_config, lineups, game, season, cols):
 	return matchups
 
 
-def _matchups(data_config, lineups, year):
+def _matchups(data_config, lineups, pbp, year):
 	"""
 	Form lineup matches for embedding purposes.
 	For each minute form ten man lineup consisting of team A and team B at time T
@@ -244,25 +244,27 @@ def _matchups(data_config, lineups, year):
 		additional config setting
 	lineups: pandas.DataFrame
 		information on single team lineup at time T
-	year: str
 	"""
 	matchups = pd.DataFrame()
 	cols = _cols(data_config)
+
+	# if data_config['gameids'] is not None:
+	# 	gameids = lineups.loc[lineups.game.isin(data_config['gameids']), 'game'].drop_duplicates(inplace=False).values
+	# else:
+	# 	gameids = lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
+
 	gameids = lineups.loc[:, 'game'].drop_duplicates(inplace=False).values
 
 	for game in tqdm(gameids):
-		try:
-			pbp = _pbp(game)
-			game_lineups = lineups.loc[lineups.game == game, :]
-			game_matchups = _game_matchups(data_config=data_config, lineups=game_lineups, cols=cols, game=game, season=year)
-			if game_matchups.empty:
-				continue
-			game_matchups = _matchup_performances(matchups=game_matchups, pbp=pbp)
-			if game_matchups.empty:
-				continue
-			matchups = matchups.append(game_matchups)
-		except Exception:
+		pbp_game = pbp.loc[pbp.game == game, :]
+		game_lineups = lineups.loc[lineups.game == game, :]
+		game_matchups = _game_matchups(data_config=data_config, lineups=game_lineups, cols=cols, game=game, season=year)
+		if game_matchups.empty:
 			continue
+		game_matchups = _matchup_performances(matchups=game_matchups, pbp=pbp_game)
+		if game_matchups.empty:
+			continue
+		matchups = matchups.append(game_matchups)
 
 	return matchups
 
@@ -279,5 +281,6 @@ if __name__ == '__main__':
 	years = data_config['years']
 	for year in years:
 		lineups = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'lineups-%s.csv' % year))
-		matchups = _matchups(data_config, lineups, year)
+		pbp = pd.read_csv('%s/%s' % (CONFIG.data.nba.lineups.dir, 'pbp-%s.csv' % year))
+		matchups = _matchups(data_config, lineups, pbp=pbp, year=year)
 		matchups.to_csv('%s/%s' % (CONFIG.data.nba.matchups.dir, 'matchups-%s.csv' % year), index=False)
