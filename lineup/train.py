@@ -32,12 +32,15 @@ def train(data_config, model_config, data, year):
         data=data,
         year=year
     )
-    model.prep_data()
-    # model.train()
-    #
-    # predictions = model.model.predict(model.val_x)
-    # print(classification_report(model.val_y, predictions))
-    # print(accuracy_score(model.val_y, predictions))
+    # model.prep_data()
+    model.train()
+
+    predictions = model.model.predict(model.val_x)
+
+    print('Results for Year: %s \n' % model.year)
+    print(classification_report(model.val_y, predictions))
+    print(accuracy_score(model.val_y, predictions))
+    print('\n')
 
 if __name__ == '__main__':
     arguments = docopt(__doc__)
